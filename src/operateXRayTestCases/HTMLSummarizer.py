@@ -142,6 +142,9 @@ def html_to_wan_visible(html_content, max_lines=1000):
             attrs.append(f"class={' '.join(section.get('class'))}")
         if section.get("aria-label"):
             attrs.append(f"aria-label={section.get('aria-label')}")
+        data_attrs = {k: v for k, v in section.attrs.items() if k.startswith("data-")}
+        if data_attrs:
+            attrs.append(f"data={data_attrs}")
         wan_lines.append(f"  [Section: {section.name.capitalize()} | {', '.join(attrs)}]")
 
         # Special handling for sidebar menu
@@ -208,23 +211,73 @@ def html_to_wan_visible(html_content, max_lines=1000):
                         wan_lines.append(f"        [Sub-Link: {sub_link_text} | {', '.join(attrs)}]")
                         sub_link_index += 1
 
-        # Special handling
+        # Special handling for app cards
         apps = section.find("div", attrs={"data-testid": os.getenv('SPECIAL_DIV')})
         if apps:
             app_index = 0
             for app_card in apps.find_all("button", attrs={"data-testid": "app-card"}):
+                # Extract the app name from the h3 and use it as the button's text
                 app_name_elem = app_card.find("h3", attrs={"data-testid": "styled-text-div"})
                 app_name = app_name_elem.find("span").get_text(strip=True) if app_name_elem and app_name_elem.find("span") else "Unnamed App"
-                app_status_elem = app_card.find("div", attrs={"data-testid": "app-status"})
-                app_status = app_status_elem.find("span").get_text(strip=True) if app_status_elem and app_status_elem.find("span") else "Unknown Status"
-                attrs = [f"status={app_status}"]
-                attrs.append(f"index={app_index}")
+                attrs = [f"index={app_index}"]
                 if app_card.get("class"): attrs.append(f"class={' '.join(app_card.get('class'))}")
                 data_attrs = {k: v for k, v in app_card.attrs.items() if k.startswith("data-")}
                 if data_attrs: attrs.append(f"data={data_attrs}")
+                attrs.append(f"text={app_name}")
                 visible = is_element_visible(app_card)
                 attrs.append(f"visible={str(visible).lower()}")
-                wan_lines.append(f"    [Button: {app_name} | {', '.join(attrs)}]")
+                wan_lines.append(f"    [Button: | {', '.join(attrs)}]")
+
+                # Child: App status div
+                app_status_div = app_card.find("div", attrs={"data-testid": lambda x: x and isinstance(x, str) and ("-enabled" in x or "-disabled" in x)})
+                if app_status_div:
+                    status_attrs = []
+                    data_attrs = {k: v for k, v in app_status_div.attrs.items() if k.startswith("data-")}
+                    if data_attrs: status_attrs.append(f"data={data_attrs}")
+                    visible = is_element_visible(app_status_div)
+                    status_attrs.append(f"visible={str(visible).lower()}")
+                    wan_lines.append(f"      [Child: Div | {', '.join(status_attrs)}]")
+
+                    # Child: Status (span)
+                    app_status_elem = app_status_div.find("div", attrs={"data-testid": "app-status"})
+                    if app_status_elem:
+                        app_status = app_status_elem.find("span").get_text(strip=True) if app_status_elem.find("span") else "Unknown Status"
+                        status_attrs = []
+                        visible = is_element_visible(app_status_elem)
+                        status_attrs.append(f"visible={str(visible).lower()}")
+                        wan_lines.append(f"        [Child: Span | text={app_status}, {', '.join(status_attrs)}]")
+
+                    # Child: Early access (span)
+                    early_access_elem = app_status_div.find("span", class_="css-urb1ba e1ia73k00")
+                    if early_access_elem:
+                        early_access_text = early_access_elem.get_text(strip=True)
+                        early_access_attrs = []
+                        if early_access_elem.get("class"): early_access_attrs.append(f"class={' '.join(early_access_elem.get('class'))}")
+                        visible = is_element_visible(early_access_elem)
+                        early_access_attrs.append(f"visible={str(visible).lower()}")
+                        wan_lines.append(f"        [Child: Span | text={early_access_text}, {', '.join(early_access_attrs)}]")
+
+                # Child: App description
+                app_desc_div = app_card.find("div", attrs={"data-testid": "app-description"})
+                if app_desc_div:
+                    desc_attrs = []
+                    data_attrs = {k: v for k, v in app_desc_div.attrs.items() if k.startswith("data-")}
+                    if data_attrs: desc_attrs.append(f"data={data_attrs}")
+                    visible = is_element_visible(app_desc_div)
+                    desc_attrs.append(f"visible={str(visible).lower()}")
+                    wan_lines.append(f"      [Child: Div | {', '.join(desc_attrs)}]")
+
+                    # Child: Description text (p)
+                    app_desc_elem = app_desc_div.find("p", attrs={"data-testid": "styled-text-div"})
+                    if app_desc_elem:
+                        app_desc = app_desc_elem.find("span").get_text(strip=True) if app_desc_elem.find("span") else "No Description"
+                        desc_text_attrs = []
+                        data_attrs = {k: v for k, v in app_desc_elem.attrs.items() if k.startswith("data-")}
+                        if data_attrs: desc_text_attrs.append(f"data={data_attrs}")
+                        visible = is_element_visible(app_desc_elem)
+                        desc_text_attrs.append(f"visible={str(visible).lower()}")
+                        wan_lines.append(f"        [Child: P | text={app_desc}, {', '.join(desc_text_attrs)}]")
+
                 app_index += 1
 
         # General links within section (excluding those already handled)
