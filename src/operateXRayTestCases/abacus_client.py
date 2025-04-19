@@ -43,31 +43,23 @@ class AbacusAIClient:
             print(f"Response content: {e.response.content if hasattr(e, 'response') else 'No response content'}")
             return None
 
-    def send_prompt(self, prompt: str, model_name: str = "claude-3-sonnet"):
-        """Send a prompt to the API"""
-        url = f"{self.base_url}/api/v0/evaluatePrompt"
-
-        payload = {
-            "prompt": prompt,
-            "modelName": model_name,
-            "maxTokens": 1000,
-            "temperature": 0.7
-        }
-
+    def send_prompt(self, prompt: str, model_name: str = "claude-3-sonnet", max_tokens: int = 1000, temperature: float = 0.7):
+        """Send a prompt to the evaluatePrompt API using the SDK"""
         try:
-            response = requests.post(
-                url,
-                headers=self.headers,
-                json=payload
+            # Call evaluatePrompt using the AI Agents API client
+            response = self.sdk_client.evaluate_prompt(
+                prompt=prompt,
+                llm_name=model_name,
+                max_tokens=max_tokens,
+                temperature=temperature
             )
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.RequestException as e:
-            print(f"Request failed: {e}")
-            print(f"Response content: {e.response.content if hasattr(e, 'response') else 'No response content'}")
+            return response.to_dict()  # Convert response to dictionary for consistency
+        except Exception as e:
+            print(f"Failed to send prompt: {e}")
             return None
+    
 
-    def execute_agent(self, wan_output: str, gherkin_step: str):
+    def execute_agent(self, step: str, snapshot: str):
         """Execute the deployed WAN to Playwright agent using the SDK"""
 
         try:
@@ -76,8 +68,8 @@ class AbacusAIClient:
                 deployment_id=self.deployment_id,
                 arguments=None,
                 keyword_arguments={
-                    "wan_output": wan_output,
-                    "gherkin_step": gherkin_step
+                    "dom": snapshot,
+                    "step": step
                 }
             )
             
@@ -86,16 +78,17 @@ class AbacusAIClient:
             print(f"Agent execution failed: {e}")
             return None
         
-    def wan_to_playwright_agent(self, wan: str, gherkin:str):
-        instruction = self.execute_agent(wan, gherkin)
-        instructions = [instr.strip() for instr in instruction['segments'][0]['segment'].split('; ') if instr.strip()]
-        return instructions
+    def jsondom_to_playwright_agent(self, step: str, snapshot:str):
+        instruction = self.execute_agent(step, snapshot)
+        print(instruction)
+        #instructions = [instr.strip() for instr in instruction['segments'][0]['segment'].split('; ') if instr.strip()]
+        return instruction
     
 
 # Example usage
 if __name__ == "__main__":
     client = AbacusAIClient()
-    """
+    
     # Example 1: List projects
     print("Listing projects...")
     projects = client.list_projects()
@@ -104,7 +97,7 @@ if __name__ == "__main__":
         print(json.dumps(projects, indent=2))
     else:
         print("Failed to list projects")
-
+    
     # Example 2: Send a prompt to the general LLM
     print("\nSending a prompt to the general LLM...")
     response = client.send_prompt("What is machine learning?")
@@ -118,13 +111,13 @@ if __name__ == "__main__":
     print("\nExecuting the trained agent...")
     deployment_id = "59f9bd0bc"  # Replace with your deployment ID
     deployment_token = "05afc22b3d3a4c329bcb804e316c374e"  # Replace with your deployment token
-    wan_output = """
+    wan_output = 
     Main navigation:
       - button "Home" with icon
       - link "Products" with dropdown
       - button "PSA" with blue background
       - link "Contact Us" aligned right
-    """
+    
     gherkin_step = "And I navigate to PSA"
 
     agent_response = client.wan_to_playwright_agent(wan_output, gherkin_step)
@@ -133,4 +126,4 @@ if __name__ == "__main__":
         print(json.dumps(agent_response, indent=2))
     else:
         print("Failed to execute agent")
-    
+    """

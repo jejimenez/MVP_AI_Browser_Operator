@@ -7,8 +7,8 @@ from abacus_client import AbacusAIClient
 from playwright.sync_api import sync_playwright
 from bs4 import BeautifulSoup
 from otp import generate_otp
+from HTMLSummarizer import html_to_json_visible
 import time
-from HTMLSummarizer import HTMLSummarizer, html_to_wan, html_to_wan_visible
 
 # Existing functions (unchanged)
 def parse_csv(file_path):
@@ -45,45 +45,48 @@ def login(page, username, password, otp_secret, url=os.getenv('URL')):
         print(f"Login failed: {e}")
         raise
 
-def parse_step_with_llm(step_text, client):
+def parse_step_with_llm(xray_steps, client):
     try:
-        code_prompt = """Write the following test case in Gherkin language. Break down each action into the smallest possible steps, ensuring that each step represents a single user action (e.g., a single click, navigation, or input). For navigation paths (e.g., "Administration → Apps → Installed"), create separate steps for each level of navigation (e.g., "Given I navigate to Administration", "Given I navigate to Apps", "Given I navigate to Installed"). Only return the Gherkin steps without any additional text or explanation. Do not include any introductory or concluding statements. The output should start with "Feature:" and only contain valid Gherkin syntax: """
-        llm_prompt = code_prompt + str(step_text)
+        code_prompt = """You are provided with a list of step groups from an Xray test case, where each group contains 'steps', 'data', and 'expected' fields. Write the entire test case in Gherkin language as a single Feature with one Scenario. Combine all steps from the step groups into a single sequential Scenario, ensuring that each step represents a single user action (e.g., a single click, navigation, or input). For navigation paths (e.g., "Administration → Apps → Installed"), create separate steps for each level of navigation (e.g., "Given I navigate to Administration", "Given I navigate to Apps", "Given I navigate to Installed"). Use the 'data' field to inform additional steps (e.g., default values or input constraints) and the 'expected' field to create validation steps (e.g., "Then I should see..."). Do not split the steps into multiple scenarios; all steps should be part of one continuous Scenario under a single Feature named according to the content of the steps and validations. Only return the Gherkin steps without any additional text or explanation. The output should start with "Feature:" and only contain valid Gherkin syntax: """
+        llm_prompt = code_prompt + str(xray_steps)
         response = client.send_prompt(prompt=llm_prompt)
         return response["result"]["content"] if response else None
     except Exception as e:
         print(f"Error occurred: {e}")
         return None
 
-def gherkin_to_playwright_with_llm(gherkin_line, wan_output, client):
-    prompt = f"""Given the following Web Abstract Notation (WAN) output representing the visible HTML structure of a webpage:
+def gherkin_to_playwright_with_llm(gherkin_line, json_dom, client):
+    playwright_prompt = f"""Given the following JSON representation of a webpage’s DOM:
 
-{wan_output}
+{json_dom}
 
 And the following Gherkin step describing a user action or validation:
 
 '{gherkin_line}'
 
-Generate Playwright instruction(s) in Python using the SYNC API (e.g., page.click(), page.fill(), page.wait_for_selector(), no 'await') to execute the Gherkin step. Use the WAN output to identify the correct element selectors based on attributes like id, class, href, aria-label, or data attributes. If the step involves validation (e.g., "Then I should see"), use page.query_selector() to check for the element's presence and return an assert statement. If multiple instructions are needed, separate them with a semicolon and a space (e.g., "page.wait_for_selector('selector'); page.click('selector')"). Return the instructions as a single string without any explanation, comments, or additional text. If only one instruction is needed, return it as a single string (e.g., "page.click('selector')"). Ensure each instruction is executable and matches the Playwright sync API syntax.
-"""
-    response = client.send_prompt(prompt)
-    
-    if response and "result" in response and "content" in response["result"]:
-        with open("prompt.test", mode='w') as output:
-            print(prompt, file=output)
-            print(response)
-        raw_instruction = response["result"]["content"]
-        if raw_instruction.startswith("```python\n"):
-            raw_instruction = raw_instruction[len("```python\n"):].rstrip("'\n```").strip("'")
-        elif raw_instruction.startswith("```"):
-            raw_instruction = raw_instruction[len("```"):].rstrip("'\n```").strip("'")
-        instruction = raw_instruction.strip().strip("'").strip('"')
-        instruction = instruction.replace("\\'", "'").replace('\\"', '"')
-        instruction = instruction.replace("await page.locator(", "page.click(").replace(").click()", ")")
-        instructions = [instr.strip() for instr in instruction.split('; ') if instr.strip()]
+Generate a structured list of valid Python Playwright instructions using the SYNC API. Use methods such as page.click(), page.fill(), page.wait_for_selector(), or page.query_selector() as appropriate. Use the JSON data to identify the correct element selectors based on attributes like id, class, href, aria-label, or data attributes.
 
-        return instructions if instructions else [f'# Error: {gherkin_line}']
-    return [f'# Error: {gherkin_line}']
+Return a JSON object with two keys:
+- "high_precision": A list of instructions using high-precision locators. Prioritize unique attributes like href, id, or data attributes (e.g., data-testid) to form the selector (e.g., a[href='#/administration/general/settings']). Avoid using :has-text() unless the 'text_source' is 'visible' and no simpler unique selector exists.
+- "low_precision": A list of instructions using low-precision locators as a fallback. Use less specific attributes like class or text (e.g., a[class='css-rxojpe']:has-text('Administration')). Only use :has-text() if the 'text_source' is 'visible'.
+
+For clickable elements like buttons or links:
+- In the high_precision list, prefer using a single, unique attribute (e.g., href, id, or data-testid). If the element has a 'text' field and its 'text_source' is 'visible', you may use :has-text('text') to refine the selector only if the selector without :has-text() is not unique. If the 'text_source' is 'aria-label', do not use :has-text() because the text is not visible in the DOM.
+- In the low_precision list, use class or text-based selectors as a fallback. Use :has-text() only if 'text_source' is 'visible'.
+
+For actions (e.g., 'navigate to'), include page.wait_for_selector() before the action with a timeout of 10000ms to confirm the element’s presence, but only if the selector is not guaranteed to be immediately available (e.g., for dynamic content). If the step involves validation (e.g., "Then I should see"), use page.query_selector() to check for the element's presence and return an assert statement (e.g., assert page.query_selector('selector') is not None). If multiple instructions are required within a list, separate them with a semicolon and a space (e.g., "page.wait_for_selector('selector'); page.click('selector')"). If no unique matching element is found, return an empty list for that precision level (e.g., "high_precision": []). Ensure each instruction is executable, targets only elements with visible=true, and matches the Playwright sync API syntax. Return the resulting JSON object as a string without any additional commentary. Do not include backticks (```) or any other extraneous characters. Be executable without modification.
+"""
+    # Call the LLM with the prompt
+    response = client.send_prompt(prompt=playwright_prompt)  # Adjust based on your actual client API
+    # Parse the JSON response
+    try:
+        result = json.loads(response["content"])
+        high_precision = result.get("high_precision", [])
+        low_precision = result.get("low_precision", [])
+        return {"high_precision": high_precision, "low_precision": low_precision}
+    except json.JSONDecodeError as e:
+        print(f"Error parsing LLM response: {e}")
+        return {"high_precision": [], "low_precision": []}
 
 
 def handle_quotes(instruction):
@@ -108,18 +111,7 @@ def handle_quotes(instruction):
 
 def gherkin_to_array(gherkin_output):
     lines = [handle_quotes(line.strip()) for line in gherkin_output.split('\n') if line.strip() and not line.strip().startswith("Feature:") and not line.strip().startswith("Scenario:") and not line.strip().startswith("```gherkin") and not line.strip() == "```"]
-    
-    processed_lines = []
-    for line in lines:
-        if "→" in line and "navigate to" in line.lower():
-            nav_path = line.split("navigate to", 1)[1].strip()
-            nav_steps = [step.strip() for step in nav_path.split("→")]
-            for step in nav_steps:
-                processed_lines.append(f"Given I navigate to {step}")
-        else:
-            processed_lines.append(line)
-    
-    return processed_lines
+    return lines
 
 def get_html(page):
     page.wait_for_load_state('networkidle')
@@ -221,7 +213,6 @@ def show_browser_message(page, message, duration=5000):
     except Exception as e:
         print(f"Error showing browser message: {str(e)}")
 
-# New function to run steps from JSON
 def run_steps_from_json(page, json_file="training_data.jsonl"):
     results = []
     try:
@@ -232,17 +223,55 @@ def run_steps_from_json(page, json_file="training_data.jsonl"):
         return results
 
     for step_data in steps:
-        gherkin_step = step_data["gherkin_step"]
-        instruction = step_data["playwright_instruction"]
-        print(f"Executing: {gherkin_step} -> {instruction}")
-        try:
-            exec(instruction)
-            results.append({"step": gherkin_step, "status": "Success"})
-            print(f"Success: {gherkin_step}")
-        except Exception as e:
-            results.append({"step": gherkin_step, "status": f"Fail: {str(e)}"})
-            print(f"Failed: {gherkin_step} -> {str(e)}")
-            break
+        gherkin_step = step_data["step"]
+        instruction = step_data["instruction"]
+        print(f"Executing: {gherkin_step}")
+
+        success = False
+        used_precision = None
+        error_message = None
+
+        # Try high_precision instructions first
+        for high_precision_instr in instruction.get("high_precision", []):
+            print(f"Trying high-precision: {high_precision_instr}")
+            try:
+                exec(high_precision_instr)
+                success = True
+                used_precision = "high_precision"
+                print(f"Success (high-precision): {gherkin_step} -> {high_precision_instr}")
+                break
+            except Exception as e:
+                print(f"Failed (high-precision): {high_precision_instr} -> {str(e)}")
+                error_message = str(e)
+
+        # If high_precision fails, try low_precision instructions
+        if not success:
+            for low_precision_instr in instruction.get("low_precision", []):
+                print(f"Trying low-precision: {low_precision_instr}")
+                try:
+                    exec(low_precision_instr)
+                    success = True
+                    used_precision = "low_precision"
+                    print(f"Success (low-precision): {gherkin_step} -> {low_precision_instr}")
+                    break
+                except Exception as e:
+                    print(f"Failed (low-precision): {low_precision_instr} -> {str(e)}")
+                    error_message = str(e)
+
+        # Record the result
+        if success:
+            results.append({
+                "step": gherkin_step,
+                "status": "Success",
+                "used_precision": used_precision
+            })
+        else:
+            results.append({
+                "step": gherkin_step,
+                "status": f"Fail: {error_message or 'No successful instruction'}"
+            })
+            print(f"Failed: {gherkin_step} -> No successful instruction")
+            break  # Stop on failure, consistent with original behavior
 
     return results
 
@@ -253,6 +282,16 @@ def sanitize_playwright_instruction(instruction):
     sanitized_instruction = re.sub(r'[^\x20-\x7E]', '', instruction)
     return sanitized_instruction
 
+def sanitize_json(obj):
+    """Sanitize JSON data to handle Unicode and ensure valid JSONL output."""
+    if isinstance(obj, str):
+        return obj.encode("ascii", "ignore").decode("ascii")
+    elif isinstance(obj, dict):
+        return {k: sanitize_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_json(item) for item in obj]
+    return obj
+
 # Main execution
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=False, slow_mo=500)
@@ -260,6 +299,7 @@ with sync_playwright() as p:
     client = AbacusAIClient()
     results = []
     training_data = []
+    xray_to_gherkin_training_data = []
 
     # Login
     login(page, os.getenv('USR'), os.getenv('PW'), os.getenv('SECRET'))
@@ -279,64 +319,113 @@ with sync_playwright() as p:
         # Default mode: Process CSV and generate steps
         print("Running in default mode...")
         csv_steps = parse_csv("NJ-86377_NoIterations.csv")
-        parsed_steps = parse_step_with_llm(csv_steps, client)
-        print("Gherkin Output:\n", parsed_steps)
-        
+        #print(csv_steps)
+        #parsed_steps = parse_step_with_llm(csv_steps, client)
+        #print("Gherkin Output:\n", parsed_steps)
+
+        # Save Xray-to-Gherkin training data
+        '''
+        if parsed_steps:
+            xray_to_gherkin_training_data.append({
+                "input": csv_steps,
+                "output": parsed_steps
+            })
+            with open("xray_to_gherkin_training_data.jsonl", mode='w', encoding='utf-8') as jsonl_file:
+                for entry in xray_to_gherkin_training_data:
+                    jsonl_file.write(json.dumps(entry) + '\n')
+            print("Xray-to-Gherkin training data saved to 'xray_to_gherkin_training_data.jsonl'")
+        '''
         # Gherkin to Playwright
-        gherkin_lines = gherkin_to_array(parsed_steps)
+        #gherkin_lines = gherkin_to_array(parsed_steps)
+        gherkin_lines = ['Given I navigate to Administration', 
+         'And I navigate to Apps', 
+         'And I navigate to Installed', 
+         'And I navigate to NinjaOne PSA', 
+         'And I navigate to General Tab', 
+         'Then I should see NinjaOne PSA administration view in General Tab', 
+         'Given I click on Edit in the Settings section', 
+         'Then the Settings modal window should pop up', 
+         'Given I choose or type a Default Invoice due days', 
+         'And the Default Invoice due days should accept a numeric value from 0 to 9999', 
+         'And by default, this field should get 30 when creating a new division', 
+         'When I click on the Save button', 
+         'Then I should see a saving message', 
+         'And there should be no errors']
         print("Processed Gherkin Steps:\n", gherkin_lines)
-        
         step_counter = 0
         for step in gherkin_lines:
             print('-----------------------------------')
-            show_browser_message(page, f"""🚀 Executing: {step}""")
+            show_browser_message(page, f"Executing: {step}")
             step_counter += 1
             html = get_html(page)
-            summarized_html = html_to_wan_visible(html)
-            #instructions = gherkin_to_playwright_with_llm(step, summarized_html, client)
-            #sample_inputs = { "wan_output": summarized_html, "gherkin_step": step}
-            ai_instructions = client.wan_to_playwright_agent(summarized_html, step)
-            print(f"instruction: {ai_instructions}")
-            #instructions = sanitize_playwright_instruction(ai_instructions['segments'][0]['segment'])
+            json_dom = html_to_json_visible(html)
+            #json_dom = page.accessibility.snapshot() # trying with the playwright snapshots
+            #ai_instructions = gherkin_to_playwright_with_llm(step, json_dom, client)
+            ai_instructions = client.jsondom_to_playwright_agent(step, json_dom)
             print(f"Step: {step}")
             print(f"Instructions: {ai_instructions}")
-            
-            # Add to training data
-            training_data.append({
-                "wan_output": summarized_html,
-                "gherkin_step": step,
-                "playwright_instruction": ai_instructions
-            })
-            
-            try:
-                for instruction in ai_instructions:
-                #if 1 == 1:
-                    #instruction = instructions
-                    print('-------------------')
-                    print(f"\t\t\t: {instruction}")
-                    if instruction.startswith('# Error'):
-                        raise Exception(f"Failed to generate instruction for step: {step}")
-                    exec(instruction)
-                results.append({"step": step, "status": "Success"})
-                print(f"Executed: {step} -> {ai_instructions}")
-            except Exception as e:
-                results.append({"step": step, "status": f"Fail: {str(e)}"})
-                print(f"Failed: {step} -> {str(e)}")
 
-                # Save training data to JSONL file
+            # Add to training data
+            training_data.append(sanitize_json({
+                "snapshot": json.dumps(json_dom),
+                "step": step,
+                "instruction": ai_instructions
+            }))
+
+            # Execute instructions with high_precision and low_precision approach
+            success = False
+            used_precision = None
+            error_message = None
+
+            # Try high_precision instructions as a single sequence
+            high_precision_instructions = ai_instructions.get("high_precision", [])
+            if high_precision_instructions:
+                print(f"Trying high-precision instructions: {high_precision_instructions}")
+                try:
+                    for instruction in high_precision_instructions:
+                        exec(instruction)
+                    success = True
+                    used_precision = "high_precision"
+                    print(f"Success (high-precision): {step} -> {high_precision_instructions}")
+                except Exception as e:
+                    error_message = str(e)
+                    print(f"Failed (high-precision): {high_precision_instructions} -> {error_message}")
+
+            # If high_precision fails, try low_precision instructions as a single sequence
+            if not success:
+                low_precision_instructions = ai_instructions.get("low_precision", [])
+                if low_precision_instructions:
+                    print(f"Trying low-precision instructions: {low_precision_instructions}")
+                    try:
+                        for instruction in low_precision_instructions:
+                            exec(instruction)
+                        success = True
+                        used_precision = "low_precision"
+                        print(f"Success (low-precision): {step} -> {low_precision_instructions}")
+                    except Exception as e:
+                        error_message = str(e)
+                        print(f"Failed (low-precision): {low_precision_instructions} -> {error_message}")
+
+            # Record the result
+            if success:
+                results.append({"step": step, "status": "Success", "used_precision": used_precision})
+            else:
+                results.append({"step": step, "status": f"Fail: {error_message or 'No successful instruction'}"})
+                print(f"Failed: {step} -> No successful instruction")
+                # Save training data to JSONL file before breaking
                 with open("training_data.jsonl", mode='w', encoding='utf-8') as jsonl_file:
                     for entry in training_data:
-                        jsonl_file.write(json.dumps(entry) + '\n')
+                        jsonl_file.write(json.dumps(entry, ensure_ascii=False) + '\n')
                 break
-            
+
             if step.find("PSA") != -1:
-                print("Stopping execution after encountering 'PSA'.")
+                print("passed the 'PSA' step")
                 #break
-        
+
         # Save training data to JSONL file
         with open("training_data.jsonl", mode='w', encoding='utf-8') as jsonl_file:
             for entry in training_data:
-                jsonl_file.write(json.dumps(entry) + '\n')
+                jsonl_file.write(json.dumps(entry, ensure_ascii=False) + '\n')
         print("Training data saved to 'training_data.jsonl'")
 
     page.wait_for_timeout(2000)
