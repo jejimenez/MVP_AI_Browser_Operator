@@ -1,4 +1,40 @@
-python-dotenv==1.0.0
-requests==2.31.0
-abacusai==1.4.40
+# Core web framework
 fastapi[standard]==0.115.12
+
+# ASGI server
+uvicorn[standard]==0.29.0
+
+# HTTP client (async)
+httpx==0.27.0
+
+# Environment variable management
+python-dotenv==1.0.0
+
+# HTML parsing
+beautifulsoup4==4.12.3
+
+# Type safety and settings
+pydantic==2.7.1
+pydantic-settings==2.2.1  # Add this line
+
+# Playwright for browser automation
+playwright==1.44.0
+
+# Abacus.AI client
+abacusai==1.4.40
+
+# System monitoring
+psutil==5.9.8
+
+# Testing
+pytest==8.2.0
+pytest-asyncio==0.23.6
+pytest-mock==3.14.0
+
+# For test client
+requests==2.31.0
+
+# Optional: for coverage reporting
+pytest-cov==5.0.0
+
+beautifulsoup4==4.12.3
