@@ -230,11 +230,11 @@ class TestRunnerService(TestRunnerInterface):
             bool: True if valid, False otherwise
         """
         try:
+            logger.info(f"Validating test steps: {test_steps}")
             parsed_steps = self.step_parser.parse_steps(test_steps)
-            return len(parsed_steps) > 0 and all(
-                step.step_type != StepType.CUSTOM
-                for step in parsed_steps
-            )
+            valid = len(parsed_steps) > 0
+            logger.info(f"Validation result: {valid}. Found {len(parsed_steps)} valid steps.")
+            return valid
         except Exception as e:
             logger.error(f"Test case validation failed: {str(e)}")
             return False

@@ -53,38 +53,32 @@ class GherkinStepParser(StepParserInterface):
     """Parser for Gherkin-style test steps."""
 
     _STEP_PATTERNS = {
-        StepType.CLICK: r"(?i)(?:click|press|select|choose)\s+(?:the\s+)?(.+)",
-        StepType.INPUT: r"(?i)(?:enter|type|fill|input)\s+(?:the\s+)?(?:text\s+)?['\"]?([^'\"]+)['\"]?\s+(?:in(?:to)?|to)\s+(?:the\s+)?(.+)",
-        StepType.NAVIGATE: r"(?i)(?:navigate\s+to|go\s+to|visit|open)\s+(?:the\s+)?(.+)",
-        StepType.VERIFY: r"(?i)(?:verify|check|assert|ensure)\s+(?:that\s+)?(.+)",
-        StepType.WAIT: r"(?i)wait\s+(?:for\s+)?(.+)"
+        StepType.NAVIGATE: r"(?i)(?:Given|When|Then|And|But)?\s*(?:I am on|I navigate to|I go to|I visit|I open)\s+(?:the\s+)?(.+?)(?:\s+page)?$",
+        StepType.INPUT: r"(?i)(?:Given|When|Then|And|But)?\s*(?:I )?(?:enter|type|fill|input)\s+[\"']([^\"']+)[\"']\s+(?:in(?:to)?|to)\s+(?:the\s+)?(.+?)(?:\s+field)?$",
+        StepType.CLICK: r"(?i)(?:Given|When|Then|And|But)?\s*(?:I )?(?:click|press|select|choose)\s+(?:the\s+)?(.+?)(?:\s+button)?$",
+        StepType.VERIFY: r"(?i)(?:Given|When|Then|And|But)?\s*(?:I )?(?:verify|check|assert|ensure|should see)\s+(?:that\s+)?(.+)$",
+        StepType.WAIT: r"(?i)(?:Given|When|Then|And|But)?\s*(?:I )?wait\s+(?:for\s+)?(.+)$"
     }
 
     def parse_steps(self, content: str) -> List[ParsedStep]:
-        """
-        Parse multiple steps from Gherkin-style content.
-
-        Args:
-            content (str): Multi-line string containing steps
-
-        Returns:
-            List[ParsedStep]: List of parsed steps
-
-        Raises:
-            StepParsingException: If parsing fails
-        """
+        """Parse multiple steps from Gherkin-style content."""
         try:
             # Split content into lines and remove empty ones
-            lines = [line.strip() for line in content.split('\n') if line.strip()]
-            
+            lines = [
+                line.strip()
+                for line in content.split('\n')
+                if line.strip()
+            ]
+
             # Parse each line
             parsed_steps = []
             for line in lines:
                 try:
                     parsed_step = self.parse_single_step(line)
-                    parsed_steps.append(parsed_step)
+                    if parsed_step:
+                        parsed_steps.append(parsed_step)
                 except InvalidStepFormatException as e:
-                    logger.warning(f"Skipping invalid step: {line}. Error: {str(e)}")
+                    logger.warning(f"Invalid step format: {line}. Error: {str(e)}")
                     continue
 
             if not parsed_steps:
@@ -93,27 +87,15 @@ class GherkinStepParser(StepParserInterface):
             return parsed_steps
 
         except Exception as e:
+            logger.error(f"Failed to parse steps: {str(e)}")
             raise StepParsingException(f"Failed to parse steps: {str(e)}")
 
     def parse_single_step(self, step: str) -> ParsedStep:
-        """
-        Parse a single Gherkin step.
-
-        Args:
-            step (str): Single step text
-
-        Returns:
-            ParsedStep: Parsed step information
-
-        Raises:
-            InvalidStepFormatException: If step format is invalid
-        """
+        """Parse a single Gherkin step."""
         try:
-            # Remove Gherkin keywords if present
-            step = re.sub(r"^(Given|When|Then|And|But)\s+", "", step.strip())
-
+            step = step.strip()
             if not step:
-                raise InvalidStepFormatException("Empty step after removing keywords")
+                raise InvalidStepFormatException("Empty step")
 
             # Try to match step against known patterns
             for step_type, pattern in self._STEP_PATTERNS.items():
@@ -121,8 +103,8 @@ class GherkinStepParser(StepParserInterface):
                 if match:
                     return self._create_parsed_step(step, step_type, match)
 
-            # If no pattern matches, treat as custom step
-            logger.debug(f"No pattern match found for step: {step}")
+            # If no pattern matches, log warning and treat as custom step
+            logger.warning(f"No pattern match found for step: {step}")
             return ParsedStep(
                 original_text=step,
                 step_type=StepType.CUSTOM,
@@ -131,35 +113,30 @@ class GherkinStepParser(StepParserInterface):
             )
 
         except Exception as e:
+            logger.error(f"Failed to parse step: {step}. Error: {str(e)}")
             raise InvalidStepFormatException(f"Invalid step format: {str(e)}")
 
     def _create_parsed_step(self, original: str, step_type: StepType, match: re.Match) -> ParsedStep:
-        """
-        Create ParsedStep object from regex match.
-
-        Args:
-            original (str): Original step text
-            step_type (StepType): Type of step
-            match (re.Match): Regex match object
-
-        Returns:
-            ParsedStep: Parsed step object
-        """
-        if step_type == StepType.INPUT:
-            return ParsedStep(
-                original_text=original,
-                step_type=step_type,
-                action="input",
-                target=match.group(2),
-                value=match.group(1)
-            )
-        else:
-            return ParsedStep(
-                original_text=original,
-                step_type=step_type,
-                action=step_type.value,
-                target=match.group(1)
-            )
+        """Create ParsedStep object from regex match."""
+        try:
+            if step_type == StepType.INPUT:
+                return ParsedStep(
+                    original_text=original,
+                    step_type=step_type,
+                    action="input",
+                    value=match.group(1),
+                    target=match.group(2)
+                )
+            else:
+                return ParsedStep(
+                    original_text=original,
+                    step_type=step_type,
+                    action=step_type.value,
+                    target=match.group(1)
+                )
+        except Exception as e:
+            logger.error(f"Failed to create parsed step: {str(e)}")
+            raise InvalidStepFormatException(f"Failed to create parsed step: {str(e)}")
 
 class StepParserFactory:
     """Factory for creating step parsers."""
@@ -406,7 +383,8 @@ class SnapshotParserFactory:
         Create snapshot parser instance.
 
         Args:
-            parser_type (str): Type of parser to create
+            parser_type (str): Type of parser to create.
+                             Supported types: ["beautifulsoup", "html", "bs4"]
 
         Returns:
             SnapshotParserInterface: Parser instance
@@ -414,11 +392,20 @@ class SnapshotParserFactory:
         Raises:
             ValueError: If parser_type is not supported
         """
+        # Define parser mappings (including aliases)
         parsers = {
-            "beautifulsoup": BeautifulSoupSnapshotParser
+            "beautifulsoup": BeautifulSoupSnapshotParser,
+            "html": BeautifulSoupSnapshotParser,  # alias
+            "bs4": BeautifulSoupSnapshotParser,   # alias
         }
 
+        # Normalize parser type
+        parser_type = parser_type.lower()
+
         if parser_type not in parsers:
-            raise ValueError(f"Unsupported parser type: {parser_type}")
+            raise ValueError(
+                f"Unsupported parser type: {parser_type}. "
+                f"Supported types are: {list(parsers.keys())}"
+            )
 
         return parsers[parser_type]()
