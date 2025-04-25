@@ -3,6 +3,7 @@
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 from datetime import datetime
+from typing import Any
 
 class StepResult(BaseModel):
     """Response model for step execution result."""
@@ -47,4 +48,4 @@ class HealthResponse(BaseModel):
     """Response model for health check."""
     status: str
     version: str
-    components: Dict[str, bool]
+    components: Dict[str, Any]

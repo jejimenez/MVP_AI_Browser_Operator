@@ -1,24 +1,14 @@
 # app/api/dependencies.py
 
-from fastapi import Depends, HTTPException, Header
+from fastapi import Header, HTTPException
 from typing import Optional
-
-from app.services.test_runner import TestRunnerInterface, TestRunnerFactory
-from app.services.health import HealthChecker
 from app.utils.config import get_settings
-
-async def get_test_runner() -> TestRunnerInterface:
-    """Dependency for test runner service."""
-    settings = get_settings()
-    return TestRunnerFactory.create_runner(
-        runner_type=settings.runner_type,
-        browser_config=settings.browser_config
-    )
+from app.services.health import HealthChecker  # Add this import
 
 async def get_current_tenant(
     x_tenant_id: Optional[str] = Header(None)
 ) -> str:
-    """Dependency for tenant identification."""
+    """Get current tenant ID from request header."""
     if not x_tenant_id:
         raise HTTPException(
             status_code=400,
@@ -29,7 +19,7 @@ async def get_current_tenant(
 async def validate_api_key(
     x_api_key: Optional[str] = Header(None)
 ) -> str:
-    """Dependency for API key validation."""
+    """Validate API key from request header."""
     if not x_api_key:
         raise HTTPException(
             status_code=400,
@@ -46,5 +36,10 @@ async def validate_api_key(
     return x_api_key
 
 async def get_health_checker() -> HealthChecker:
-    """Dependency for health checker service."""
+    """
+    Dependency for getting health checker instance.
+    
+    Returns:
+        HealthChecker: Instance of health checker service
+    """
     return HealthChecker()

@@ -14,9 +14,12 @@ from app.schemas.responses import (
     TestExecutionStatus,
     TestSuiteResponse
 )
-from app.services.test_runner import TestRunnerInterface, TestRunnerFactory
+from app.services.test_runner import (
+    TestRunnerInterface,
+    create_test_runner,  # Changed from TestRunnerFactory
+    StepExecutionResult
+)
 from app.api.dependencies import (
-    get_test_runner,
     get_current_tenant,
     validate_api_key
 )
@@ -25,6 +28,11 @@ from app.utils.logger import get_logger
 logger = get_logger(__name__)
 
 router = APIRouter()
+
+# Update the dependency
+def get_test_runner() -> TestRunnerInterface:
+    """Dependency for getting test runner instance."""
+    return create_test_runner()
 
 @router.post(
     "/execute",
@@ -171,7 +179,9 @@ async def execute_test_suite(
 ) -> TestSuiteResponse:
     """Execute multiple test cases as a suite."""
     try:
+        start_time = datetime.now()
         suite_results = []
+
         for test_case in request.test_cases:
             result = await execute_test_case(
                 test_case,
@@ -181,11 +191,15 @@ async def execute_test_suite(
             )
             suite_results.append(result)
 
+        end_time = datetime.now()
+        total_duration = (end_time - start_time).total_seconds()
+
         return TestSuiteResponse(
             suite_id=request.suite_id,
             tenant_id=tenant_id,
-            execution_time=datetime.now(),
+            execution_time=end_time,
             results=suite_results,
+            total_duration=total_duration,
             total_cases=len(suite_results),
             successful_cases=sum(1 for r in suite_results if r.success),
             failed_cases=sum(1 for r in suite_results if not r.success)
@@ -199,11 +213,11 @@ async def execute_test_suite(
         )
 
 # Helper functions
-async def cleanup_test_artifacts(step_results: List[dict]) -> None:
+async def cleanup_test_artifacts(step_results: List[StepExecutionResult]) -> None:
     """Clean up screenshots and other artifacts after test execution."""
     try:
         for result in step_results:
-            if result.get("screenshot_url"):
+            if result.execution_result.screenshot_path:
                 # Delete screenshot file
                 pass
     except Exception as e:
