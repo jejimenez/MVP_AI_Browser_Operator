@@ -11,14 +11,3 @@ Test Description:
 {natural_language_description}
 
 Output only the JSON array, no explanations.
-
-# app/prompts/gherkin_to_playwright.txt
-You are an expert in browser automation.
-
-Given this HTML page structure:
-{html_snapshot}
-
-And this Gherkin step:
-{gherkin_step}
-
-Generate a single Playwright JavaScript instruction that will execute this step. Output only the code, no explanations.

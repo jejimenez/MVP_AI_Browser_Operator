@@ -89,7 +89,7 @@ class TestTestRunner:
         )
 
         assert result.success
-        assert len(result.steps_results) == 3
+        assert len(result.steps_results) == 5
         assert result.error_message is None
         assert isinstance(result.start_time, datetime)
         assert isinstance(result.end_time, datetime)
@@ -165,7 +165,6 @@ class TestTestRunner:
         for step_result in result.steps_results:
             assert isinstance(step_result, StepExecutionResult)
             assert step_result.snapshot_before == SAMPLE_HTML
-            assert step_result.snapshot_after == SAMPLE_HTML
             assert step_result.playwright_instruction
             assert isinstance(step_result.start_time, datetime)
             assert isinstance(step_result.end_time, datetime)

@@ -37,7 +37,6 @@ class StepExecutionResult:
     execution_result: ExecutionResult
     playwright_instruction: str
     snapshot_before: str
-    snapshot_after: str
     start_time: datetime
     end_time: datetime
     duration: float
@@ -174,7 +173,7 @@ class TestRunnerService(TestRunnerInterface):
             execution_result = await self._browser_manager.execute_step(instruction)
 
             # Get snapshot after execution
-            snapshot_after = await self._browser_manager.get_page_content()
+            #snapshot_after = await self._browser_manager.get_page_content()
 
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds()
@@ -185,7 +184,6 @@ class TestRunnerService(TestRunnerInterface):
                 execution_result=execution_result,
                 playwright_instruction=instruction,
                 snapshot_before=snapshot_before,
-                snapshot_after=snapshot_after,
                 start_time=start_time,
                 end_time=end_time,
                 duration=duration

@@ -2,8 +2,8 @@
 
 from functools import lru_cache
 from typing import List, Optional
-from pydantic import BaseModel, HttpUrl, Field
-from pydantic_settings import BaseSettings
+from pydantic import BaseModel, HttpUrl, Field, ConfigDict
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class BrowserConfig(BaseModel):
     """Settings for the Playwright browser."""
@@ -20,6 +20,11 @@ class AbacusConfig(BaseModel):
     base_url: HttpUrl = Field(default="https://api.abacus.ai", alias="abacus_base_url")
     deployment_id: str = Field(alias="abacus_deployment_id")
     deployment_token: str = Field(alias="abacus_deployment_token")
+
+    model_config = ConfigDict(
+        populate_by_name=True,  # Allows population by alias
+        from_attributes=True    # Allows creation from ORM objects
+    )
 
 class Settings(BaseSettings):
     """Main application settings."""
@@ -47,19 +52,30 @@ class Settings(BaseSettings):
     url: HttpUrl
     special_div: str
 
-    class Config:
-        env_file = ".env"
-        env_nested_delimiter = '__'
-        case_sensitive = False
+    # New style configuration using SettingsConfigDict
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_nested_delimiter='__',
+        case_sensitive=False,
+        extra='allow',  # Allows extra fields in the settings
+        validate_default=True  # Validates default values
+    )
 
 @lru_cache()
 def get_settings() -> Settings:
-    """Cached settings instance."""
+    """
+    Get cached settings instance.
+    Returns:
+        Settings: Application settings instance
+    """
     return Settings()
 
-# Optional: Helper function to get Abacus config
 def get_abacus_config() -> AbacusConfig:
-    """Get Abacus.AI specific configuration."""
+    """
+    Get Abacus.AI specific configuration.
+    Returns:
+        AbacusConfig: Abacus.AI configuration instance
+    """
     settings = get_settings()
     return AbacusConfig(
         api_key=settings.abacus_api_key,

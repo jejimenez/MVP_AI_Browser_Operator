@@ -51,3 +51,7 @@ class StepExecutionException(TestExecutionException):
 class StepGenerationException(AIClientException):
     """Exception for AI step generation failures."""
     pass
+
+class SecurityException(Exception):
+    """Raised when an instruction violates security constraints."""
+    pass

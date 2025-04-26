@@ -58,6 +58,8 @@ class NLToGherkinGenerator(GeneratorInterface):
                 natural_language.strip()
             )
 
+            logger.debug(f"Prompt: {prompt}")
+
             # Get response from AI
             response = await self.ai_client.send_prompt(prompt)
 

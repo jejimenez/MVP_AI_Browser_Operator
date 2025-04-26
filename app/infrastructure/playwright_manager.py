@@ -3,11 +3,12 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any, List, AsyncGenerator
 from dataclasses import dataclass
-import asyncio
-import base64
 from datetime import datetime
-import os
 from pathlib import Path
+from app.utils.html_summarizer import html_to_json_visible
+from app.domain.exceptions import SecurityException
+from typing import Set, Pattern
+import re
 
 from playwright.async_api import async_playwright, Browser, Page, Playwright
 import logging
@@ -66,6 +67,39 @@ class BrowserManagerInterface(ABC):
 
 class PlaywrightManager(BrowserManagerInterface):
     """Manages Playwright browser sessions and interactions."""
+
+    ALLOWED_ACTIONS: Set[Pattern] = {
+        # Navigation
+        re.compile(r"goto\(['\"](https?://[^'\"]+)['\"]"),
+
+        # Click actions
+        re.compile(r"click\(['\"]([^'\"]+)['\"]\)"),
+        re.compile(r"dblclick\(['\"]([^'\"]+)['\"]\)"),
+
+        # Form interactions
+        re.compile(r"fill\(['\"]([^'\"]+)['\"], ['\"]([^'\"]+)['\"]\)"),
+        re.compile(r"type\(['\"]([^'\"]+)['\"], ['\"]([^'\"]+)['\"]\)"),
+        re.compile(r"press\(['\"]([^'\"]+)['\"], ['\"]([^'\"]+)['\"]\)"),
+        re.compile(r"check\(['\"]([^'\"]+)['\"]\)"),
+        re.compile(r"uncheck\(['\"]([^'\"]+)['\"]\)"),
+        re.compile(r"select_option\(['\"]([^'\"]+)['\"], ['\"]([^'\"]+)['\"]\)"),
+
+        # Mouse interactions
+        re.compile(r"hover\(['\"]([^'\"]+)['\"]\)"),
+        re.compile(r"focus\(['\"]([^'\"]+)['\"]\)"),
+
+        # Wait actions
+        re.compile(r"wait_for_selector\(['\"]([^'\"]+)['\"]\)"),
+        re.compile(r"wait_for_load_state\(['\"]?([^'\"]+)['\"]?\)"),
+
+        # Keyboard
+        re.compile(r"keyboard\.press\(['\"]([^'\"]+)['\"]\)"),
+        re.compile(r"keyboard\.type\(['\"]([^'\"]+)['\"]\)"),
+
+        # Expect assertions (for verification)
+        re.compile(r"expect\(page\.locator\(['\"]([^'\"]+)['\"]\)\)\.to_be_visible\(\)"),
+        re.compile(r"expect\(page\.locator\(['\"]([^'\"]+)['\"]\)\)\.to_have_text\(['\"]([^'\"]+)['\"]\)"),
+    }
 
     def __init__(
         self,
@@ -154,6 +188,26 @@ class PlaywrightManager(BrowserManagerInterface):
         except Exception as e:
             raise NavigationException(f"Navigation failed: {str(e)}")
 
+
+    def _is_instruction_allowed(self, instruction: str) -> bool:
+        """
+        Check if the instruction matches any allowed pattern.
+
+        Args:
+            instruction (str): The Playwright instruction to check
+
+        Returns:
+            bool: True if instruction is allowed, False otherwise
+        """
+        # Remove common prefixes
+        clean_instruction = instruction.replace('await ', '').replace('page.', '')
+
+        # Check against allowed patterns
+        return any(
+            pattern.match(clean_instruction) is not None
+            for pattern in self.ALLOWED_ACTIONS
+        )
+
     async def execute_step(self, instruction: str) -> ExecutionResult:
         """
         Execute a Playwright instruction and capture the result.
@@ -167,18 +221,33 @@ class PlaywrightManager(BrowserManagerInterface):
         Raises:
             BrowserException: If browser is not initialized
             ElementNotFoundException: If required element is not found
+            SecurityException: If instruction is not allowed
         """
         if not self._page:
             raise BrowserException("Browser not initialized")
 
         start_time = datetime.now()
+
         try:
+            # Clean up instruction
+            clean_instruction = instruction.replace('await ', '').replace('page.', '')
+            logger.debug(f"Executing instruction: {clean_instruction}")
+
+            # Check if instruction is allowed
+            if not self._is_instruction_allowed(clean_instruction):
+                raise SecurityException(
+                    f"Instruction not allowed: {clean_instruction}"
+                )
+
             # Execute the instruction
             exec_locals = {
                 "page": self._page,
-                "expect": self._page.expect_event
+                "expect": self._page.expect_event,
+                "keyboard": self._page.keyboard
             }
-            await eval(f"page.{instruction}", {"page": self._page})
+
+            # Execute with proper context
+            await eval(f"page.{clean_instruction}", {"page": self._page})
 
             # Take screenshot after execution
             screenshot_path = await self._take_screenshot()
@@ -188,6 +257,29 @@ class PlaywrightManager(BrowserManagerInterface):
                 success=True,
                 screenshot_path=screenshot_path,
                 page_url=self._page.url,
+                execution_time=execution_time
+            )
+
+        except SecurityException as e:
+            logger.error(f"Security violation: {str(e)}")
+            return ExecutionResult(
+                success=False,
+                screenshot_path=None,
+                error_message=str(e),
+                page_url=self._page.url if self._page else None,
+                execution_time=(datetime.now() - start_time).total_seconds()
+            )
+
+        except Exception as e:
+            logger.error(f"Step execution failed: {str(e)}")
+            screenshot_path = await self._take_screenshot("error")
+
+            execution_time = (datetime.now() - start_time).total_seconds()
+            return ExecutionResult(
+                success=False,
+                screenshot_path=screenshot_path,
+                error_message=str(e),
+                page_url=self._page.url if self._page else None,
                 execution_time=execution_time
             )
 
@@ -249,7 +341,27 @@ class PlaywrightManager(BrowserManagerInterface):
             return await self._page.content()
         except Exception as e:
             raise BrowserException(f"Failed to get page content: {str(e)}")
+    """
+    async def get_page_snapshot(self) -> str:
+        try:
+            if not self.page:
+                logger.warning("No active page found when trying to get page snapshot")
+                return ""
 
+            # Get the full HTML content
+            full_html = await self.page.content()
+
+            # Get summarized version using HTMLSummarizer
+            logger.debug("Generating summarized HTML snapshot")
+            summarized_html = html_to_json_visible(full_html)
+
+            logger.debug(f"Generated HTML snapshot: {summarized_html[:2000]}...")  # Log first 200 chars
+            return summarized_html
+
+        except Exception as e:
+            logger.error(f"Error getting page snapshot: {str(e)}")
+            return ""
+    """
     async def __aenter__(self) -> 'PlaywrightManager':
         """Async context manager entry."""
         await self.start()
@@ -258,6 +370,7 @@ class PlaywrightManager(BrowserManagerInterface):
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
         """Async context manager exit."""
         await self.stop()
+
 
 # Factory function for creating browser managers
 def create_browser_manager(
