@@ -1,411 +1,192 @@
 # app/domain/step_parser.py
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Optional, Any, Set
 from dataclasses import dataclass
 from enum import Enum
+from typing import List, Optional, Dict, Any
 import re
-import json
-from bs4 import BeautifulSoup
+from datetime import datetime
 
-from app.utils.logger import get_logger
-from app.domain.exceptions import (
-    StepParsingException,
-    InvalidStepFormatException,
-    SnapshotParsingException
-)
-
-logger = get_logger(__name__)
+from app.domain.exceptions import InvalidStepFormatException
 
 class StepType(Enum):
-    """Enumeration of possible step types."""
+    NAVIGATE = "navigate"
     CLICK = "click"
     INPUT = "input"
-    NAVIGATE = "navigate"
-    VERIFY = "verify"
     WAIT = "wait"
-    CUSTOM = "custom"
+    VERIFY = "verify"
 
 @dataclass
 class ParsedStep:
-    """Represents a parsed test step."""
-    original_text: str
+    """Represents a parsed Gherkin step with structured information."""
     step_type: StepType
+    target: str
+    value: Optional[str]
+    original_text: str
+    metadata: Dict[str, Any]
     action: str
-    target: Optional[str] = None
-    value: Optional[str] = None
-    metadata: Dict[str, Any] = None
 
-class StepParserInterface(ABC):
-    """Abstract interface for step parsers."""
+    def __post_init__(self):
+        """Validate the step after initialization."""
+        if not self.action:
+            self.action = self.step_type.value
+        if not isinstance(self.step_type, StepType):
+            raise ValueError(f"Invalid step type: {self.step_type}")
+
+class StepParser(ABC):
+    """Abstract base class for step parsers."""
 
     @abstractmethod
-    def parse_steps(self, content: str) -> List[ParsedStep]:
-        """Parse multiple steps from content."""
+    def parse_steps(self, steps_text: str) -> List[ParsedStep]:
+        """Parse multiple steps from text."""
         pass
 
     @abstractmethod
     def parse_single_step(self, step: str) -> ParsedStep:
-        """Parse a single step."""
+        """Parse a single step from text."""
         pass
 
-class GherkinStepParser(StepParserInterface):
-    """Parser for Gherkin-style test steps."""
+class GherkinStepParser(StepParser):
+    """Parser for Gherkin-style steps."""
 
-    _STEP_PATTERNS = {
-        StepType.NAVIGATE: r"(?i)(?:Given|When|Then|And|But)?\s*(?:I am on|I navigate to|I go to|I visit|I open)\s+(?:the\s+)?(.+?)(?:\s+page)?$",
-        StepType.INPUT: r"(?i)(?:Given|When|Then|And|But)?\s*(?:I )?(?:enter|type|fill|input)\s+[\"']([^\"']+)[\"']\s+(?:in(?:to)?|to)\s+(?:the\s+)?(.+?)(?:\s+field)?$",
-        StepType.CLICK: r"(?i)(?:Given|When|Then|And|But)?\s*(?:I )?(?:click|press|select|choose)\s+(?:the\s+)?(.+?)(?:\s+button)?$",
-        StepType.VERIFY: r"(?i)(?:Given|When|Then|And|But)?\s*(?:I )?(?:verify|check|assert|ensure|should see)\s+(?:that\s+)?(.+)$",
-        StepType.WAIT: r"(?i)(?:Given|When|Then|And|But)?\s*(?:I )?wait\s+(?:for\s+)?(.+)$"
+    # Gherkin keywords
+    KEYWORDS = ("given", "when", "then", "and", "but")
+
+    # Regular expressions for different step types
+    PATTERNS = {
+        # Click pattern matches "click/press/tap the <target> button/link"
+        "click": r"(?:click|press|tap)(?:\s+(?:the|on|at))?\s+(.+?(?:\s+(?:button|link|element))?)$",
+
+        # Input pattern matches "enter/type/fill '<value>' into/in the <target> field/input"
+        "input": r"(?:enter|type|fill|input)\s+['\"](.+?)['\"](?:\s+(?:into|in|to))?\s+(?:the\s+)?(.+?(?:\s+(?:field|input|box))?)$",
+
+        # Navigate pattern matches "am on/go to/navigate to the <target> page"
+        "navigate": r"(?:am\s+on|go\s+to|navigate\s+to)(?:\s+the)?\s+(.+?(?:\s+page)?)$",
+
+        # Wait pattern matches "wait for <target> seconds/minutes"
+        "wait": r"wait\s+(?:for\s+)?(\d+(?:\s+(?:second|seconds|minute|minutes)))$",
+
+        # Verify pattern matches "see/verify/check the <target>"
+        "verify": r"(?:see|verify|check|confirm)(?:\s+that)?(?:\s+the)?\s+(.+?)(?:\s+is\s+displayed|\s+appears)?$"
     }
 
-    def parse_steps(self, content: str) -> List[ParsedStep]:
-        """Parse multiple steps from Gherkin-style content."""
-        try:
-            # Split content into lines and remove empty ones
-            lines = [
-                line.strip()
-                for line in content.split('\n')
-                if line.strip()
-            ]
+    def parse_steps(self, steps_text: str) -> List[ParsedStep]:
+        """Parse multiple steps from text."""
+        if not steps_text or not steps_text.strip():
+            return []
 
-            # Parse each line
-            parsed_steps = []
-            for line in lines:
-                try:
-                    parsed_step = self.parse_single_step(line)
-                    if parsed_step:
-                        parsed_steps.append(parsed_step)
-                except InvalidStepFormatException as e:
-                    logger.warning(f"Invalid step format: {line}. Error: {str(e)}")
-                    continue
+        # Split text into lines and filter out empty lines and comments
+        lines = [
+            line.strip()
+            for line in steps_text.split('\n')
+            if line.strip() and not line.strip().startswith('#')
+        ]
 
-            if not parsed_steps:
-                raise StepParsingException("No valid steps found in content")
-
-            return parsed_steps
-
-        except Exception as e:
-            logger.error(f"Failed to parse steps: {str(e)}")
-            raise StepParsingException(f"Failed to parse steps: {str(e)}")
+        return [self.parse_single_step(step) for step in lines]
 
     def parse_single_step(self, step: str) -> ParsedStep:
-        """Parse a single Gherkin step."""
-        try:
-            step = step.strip()
-            if not step:
-                raise InvalidStepFormatException("Empty step")
+        """Parse a single step from text."""
+        if not step or not step.strip():
+            raise InvalidStepFormatException("Empty step")
 
-            # Try to match step against known patterns
-            for step_type, pattern in self._STEP_PATTERNS.items():
-                match = re.match(pattern, step)
-                if match:
-                    return self._create_parsed_step(step, step_type, match)
+        # Extract keyword and main step text
+        step = step.strip()
+        keyword = self._extract_keyword(step)
+        step_text = step[len(keyword):].strip()
 
-            # If no pattern matches, log warning and treat as custom step
-            logger.warning(f"No pattern match found for step: {step}")
-            return ParsedStep(
-                original_text=step,
-                step_type=StepType.CUSTOM,
-                action="custom",
-                metadata={"raw_text": step}
-            )
+        if not step_text or step_text.strip() == "":
+            raise InvalidStepFormatException("Step is empty or whitespace only.")
 
-        except Exception as e:
-            logger.error(f"Failed to parse step: {step}. Error: {str(e)}")
-            raise InvalidStepFormatException(f"Invalid step format: {str(e)}")
+        # Try each pattern to find matching step type
+        for step_type in StepType:
+            pattern = self.PATTERNS.get(step_type.value)
+            if not pattern:
+                continue
 
-    def _create_parsed_step(self, original: str, step_type: StepType, match: re.Match) -> ParsedStep:
-        """Create ParsedStep object from regex match."""
-        try:
-            if step_type == StepType.INPUT:
-                return ParsedStep(
-                    original_text=original,
+            match = re.search(pattern, step_text.lower())
+            if match:
+                return self._create_parsed_step(
                     step_type=step_type,
-                    action="input",
-                    value=match.group(1),
-                    target=match.group(2)
+                    match=match,
+                    original_text=step,
+                    keyword=keyword
                 )
-            else:
-                return ParsedStep(
-                    original_text=original,
-                    step_type=step_type,
-                    action=step_type.value,
-                    target=match.group(1)
-                )
-        except Exception as e:
-            logger.error(f"Failed to create parsed step: {str(e)}")
-            raise InvalidStepFormatException(f"Failed to create parsed step: {str(e)}")
+
+        # If no pattern matches, default to verify
+        return ParsedStep(
+            step_type=StepType.VERIFY,
+            target=step_text,
+            value=None,
+            original_text=step,
+            metadata=self._create_metadata(keyword),
+            action=StepType.VERIFY.value
+        )
+
+    def _extract_keyword(self, step: str) -> str:
+        """Extract the Gherkin keyword from the step."""
+        words = step.strip().lower().split()
+        if not words:
+            raise InvalidStepFormatException("Empty step")
+
+        keyword = words[0]
+        if keyword not in self.KEYWORDS:
+            raise InvalidStepFormatException(f"Invalid step keyword: {keyword}")
+
+        return step[:len(keyword)].strip()
+
+    def _create_parsed_step(
+        self,
+        step_type: StepType,
+        match: re.Match,
+        original_text: str,
+        keyword: str
+    ) -> ParsedStep:
+        """Create a ParsedStep instance based on the match."""
+        if step_type == StepType.INPUT:
+            value = match.group(1)
+            target = match.group(2).strip()  # Added strip() to clean up any extra spaces
+        else:
+            value = None
+            target = match.group(1).strip()  # Added strip() to clean up any extra spaces
+
+        # Special handling for wait steps to ensure we capture the full duration
+        if step_type == StepType.WAIT:
+            if not "second" in target and not "minute" in target:
+                target = f"{target} seconds"  # Default to seconds if not specified
+
+        # Special handling for navigate steps
+        if step_type == StepType.NAVIGATE:
+            if not "page" in target.lower():
+                target = f"{target} page"
+
+        return ParsedStep(
+            step_type=step_type,
+            target=target,
+            value=value,
+            original_text=original_text,
+            metadata=self._create_metadata(keyword),
+            action=step_type.value
+        )
+
+    def _create_metadata(self, keyword: str) -> Dict[str, Any]:
+        """Create metadata for the step."""
+        return {
+            "keyword": keyword,
+            "timestamp": datetime.utcnow().isoformat(),
+            "parser_version": "1.0"
+        }
 
 class StepParserFactory:
     """Factory for creating step parsers."""
 
     @staticmethod
-    def create_parser(parser_type: str = "gherkin") -> StepParserInterface:
-        """
-        Create step parser instance.
-
-        Args:
-            parser_type (str): Type of parser to create
-
-        Returns:
-            StepParserInterface: Parser instance
-
-        Raises:
-            ValueError: If parser_type is not supported
-        """
+    def create_parser(parser_type: str = "gherkin") -> StepParser:
+        """Create a step parser of the specified type."""
         parsers = {
             "gherkin": GherkinStepParser
         }
 
         if parser_type not in parsers:
             raise ValueError(f"Unsupported parser type: {parser_type}")
-
-        return parsers[parser_type]()
-
-@dataclass
-class ParsedElement:
-    """Represents a parsed HTML element."""
-    tag: str
-    element_type: Optional[str]
-    identifier: Optional[str]
-    text_content: Optional[str]
-    attributes: Dict[str, str]
-    xpath: str
-    css_selector: str
-    is_clickable: bool = False
-    is_visible: bool = True
-    metadata: Dict[str, Any] = None
-
-class SnapshotParserInterface(ABC):
-    """Abstract interface for HTML snapshot parsers."""
-
-    @abstractmethod
-    def parse_snapshot(self, html_content: str) -> List[ParsedElement]:
-        """Parse HTML snapshot and extract elements."""
-        pass
-
-    @abstractmethod
-    def find_element(self, html_content: str, target: str) -> Optional[ParsedElement]:
-        """Find specific element in HTML snapshot."""
-        pass
-
-class BeautifulSoupSnapshotParser(SnapshotParserInterface):
-    """HTML snapshot parser using BeautifulSoup."""
-
-    INTERACTIVE_ELEMENTS = {
-        'a', 'button', 'input', 'select', 'textarea', 'label',
-        'details', 'dialog', 'menu', 'menuitem', 'option'
-    }
-
-    def parse_snapshot(self, html_content: str) -> List[ParsedElement]:
-        """
-        Parse HTML content and extract relevant elements.
-
-        Args:
-            html_content (str): HTML content to parse
-
-        Returns:
-            List[ParsedElement]: List of parsed elements
-
-        Raises:
-            SnapshotParsingException: If parsing fails
-        """
-        try:
-            soup = BeautifulSoup(html_content, 'html.parser')
-            parsed_elements = []
-
-            for element in soup.find_all(True):  # Find all tags
-                try:
-                    parsed_element = self._parse_element(element)
-                    if parsed_element:
-                        parsed_elements.append(parsed_element)
-                except Exception as e:
-                    logger.warning(f"Failed to parse element {element}: {str(e)}")
-                    continue
-
-            return parsed_elements
-
-        except Exception as e:
-            raise SnapshotParsingException(f"Failed to parse HTML snapshot: {str(e)}")
-
-    def find_element(self, html_content: str, target: str) -> Optional[ParsedElement]:
-        """
-        Find specific element in HTML content.
-
-        Args:
-            html_content (str): HTML content to search in
-            target (str): Target element description
-
-        Returns:
-            Optional[ParsedElement]: Found element or None
-
-        Raises:
-            SnapshotParsingException: If parsing fails
-        """
-        try:
-            soup = BeautifulSoup(html_content, 'html.parser')
-
-            # Try different search strategies
-            element = (
-                self._find_by_text(soup, target) or
-                self._find_by_id(soup, target) or
-                self._find_by_name(soup, target) or
-                self._find_by_aria_label(soup, target)
-            )
-
-            if element:
-                return self._parse_element(element)
-            return None
-
-        except Exception as e:
-            raise SnapshotParsingException(f"Failed to find element '{target}': {str(e)}")
-
-    def _parse_element(self, element) -> Optional[ParsedElement]:
-        """Parse BeautifulSoup element into ParsedElement."""
-        try:
-            # Get element attributes
-            attrs = dict(element.attrs) if hasattr(element, 'attrs') else {}
-
-            # Generate selectors
-            css_selector = self._generate_css_selector(element)
-            xpath = self._generate_xpath(element)
-
-            # Determine if element is interactive
-            is_clickable = (
-                element.name in self.INTERACTIVE_ELEMENTS or
-                'onclick' in attrs or
-                'role' in attrs and attrs['role'] in {'button', 'link', 'menuitem'}
-            )
-
-            return ParsedElement(
-                tag=element.name,
-                element_type=attrs.get('type'),
-                identifier=attrs.get('id') or attrs.get('name'),
-                text_content=element.get_text(strip=True),
-                attributes=attrs,
-                xpath=xpath,
-                css_selector=css_selector,
-                is_clickable=is_clickable,
-                is_visible=self._is_visible(element)
-            )
-
-        except Exception as e:
-            logger.warning(f"Failed to parse element: {str(e)}")
-            return None
-
-    def _find_by_text(self, soup: BeautifulSoup, text: str) -> Optional[Any]:
-        """Find element by visible text content."""
-        return soup.find(lambda tag: tag.get_text(strip=True) == text)
-
-    def _find_by_id(self, soup: BeautifulSoup, id_: str) -> Optional[Any]:
-        """Find element by ID."""
-        return soup.find(id=id_)
-
-    def _find_by_name(self, soup: BeautifulSoup, name: str) -> Optional[Any]:
-        """Find element by name attribute."""
-        return soup.find(attrs={"name": name})
-
-    def _find_by_aria_label(self, soup: BeautifulSoup, label: str) -> Optional[Any]:
-        """Find element by aria-label attribute."""
-        return soup.find(attrs={"aria-label": label})
-
-    def _generate_css_selector(self, element) -> str:
-        """Generate CSS selector for element."""
-        selectors = []
-        current = element
-
-        while current and current.name:
-            # Add tag
-            current_selector = current.name
-
-            # Add ID if present
-            if 'id' in current.attrs:
-                current_selector += f"#{current['id']}"
-                selectors.insert(0, current_selector)
-                break
-
-            # Add classes if present
-            if 'class' in current.attrs:
-                classes = '.'.join(current['class'])
-                current_selector += f".{classes}"
-
-            # Add position
-            if current.parent:
-                siblings = current.parent.find_all(current.name, recursive=False)
-                if len(siblings) > 1:
-                    position = siblings.index(current) + 1
-                    current_selector += f":nth-of-type({position})"
-
-            selectors.insert(0, current_selector)
-            current = current.parent
-
-        return ' > '.join(selectors)
-
-    def _generate_xpath(self, element) -> str:
-        """Generate XPath for element."""
-        components = []
-        current = element
-
-        while current and current.name:
-            # Add tag
-            current_xpath = current.name
-
-            # Add position if needed
-            if current.parent:
-                siblings = current.parent.find_all(current.name, recursive=False)
-                if len(siblings) > 1:
-                    position = siblings.index(current) + 1
-                    current_xpath += f"[{position}]"
-
-            components.insert(0, current_xpath)
-            current = current.parent
-
-        return '//' + '/'.join(components)
-
-    def _is_visible(self, element) -> bool:
-        """Determine if element is likely visible."""
-        style = element.get('style', '').lower()
-        return not (
-            'display: none' in style or
-            'visibility: hidden' in style or
-            element.get('hidden') is not None or
-            element.get('aria-hidden') == 'true'
-        )
-
-class SnapshotParserFactory:
-    """Factory for creating snapshot parsers."""
-
-    @staticmethod
-    def create_parser(parser_type: str = "beautifulsoup") -> SnapshotParserInterface:
-        """
-        Create snapshot parser instance.
-
-        Args:
-            parser_type (str): Type of parser to create.
-                             Supported types: ["beautifulsoup", "html", "bs4"]
-
-        Returns:
-            SnapshotParserInterface: Parser instance
-
-        Raises:
-            ValueError: If parser_type is not supported
-        """
-        # Define parser mappings (including aliases)
-        parsers = {
-            "beautifulsoup": BeautifulSoupSnapshotParser,
-            "html": BeautifulSoupSnapshotParser,  # alias
-            "bs4": BeautifulSoupSnapshotParser,   # alias
-        }
-
-        # Normalize parser type
-        parser_type = parser_type.lower()
-
-        if parser_type not in parsers:
-            raise ValueError(
-                f"Unsupported parser type: {parser_type}. "
-                f"Supported types are: {list(parsers.keys())}"
-            )
 
         return parsers[parser_type]()

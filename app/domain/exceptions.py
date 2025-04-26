@@ -8,6 +8,9 @@ class InvalidPromptException(AIClientException):
     """Exception for invalid prompt inputs."""
     pass
 
+class ValidationException(Exception):
+    """Base exception for validation errors."""
+    pass
 
 class BrowserException(Exception):
     """Base exception for browser-related errors."""
@@ -43,4 +46,8 @@ class TestExecutionException(Exception):
 
 class StepExecutionException(TestExecutionException):
     """Exception for step execution failures."""
+    pass
+
+class StepGenerationException(AIClientException):
+    """Exception for AI step generation failures."""
     pass
