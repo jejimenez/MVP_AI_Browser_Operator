@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional, Dict, Any
 import re
-from datetime import datetime
+from datetime import datetime, UTC
 
 from app.domain.exceptions import InvalidStepFormatException
 
@@ -172,7 +172,7 @@ class GherkinStepParser(StepParser):
         """Create metadata for the step."""
         return {
             "keyword": keyword,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "parser_version": "1.0"
         }
 

@@ -4,6 +4,7 @@ from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 import json
 import os
+from app.domain.exceptions import AIClientException
 from abc import ABC, abstractmethod
 
 from app.infrastructure.ai_client import AIClientInterface
@@ -58,13 +59,13 @@ class NLToGherkinGenerator(GeneratorInterface):
                 natural_language.strip()
             )
 
-            logger.debug(f"Prompt: {prompt}")
+            logger.debug(f"NLToGherkinGenerator Prompt: {prompt}")
 
             # Get response from AI
             response = await self.ai_client.send_prompt(prompt)
 
             # Add debug logging
-            logger.debug(f"AI Response content: {response.content}")
+            logger.debug(f"NLToGherkinGenerator Response: {response.content}")
 
             # Validate response format
             if not await self.validate_response(response.content):
@@ -84,6 +85,10 @@ class NLToGherkinGenerator(GeneratorInterface):
                 for step in steps_data
             ]
 
+        except AIClientException as e:
+            # Handle AI client specific errors (e.g., rate limits)
+            logger.error(f"AI client error during instruction generation: {e}")
+            raise StepGenerationException(f"AI client error: {str(e)}") from e
         except json.JSONDecodeError as e:
             raise StepGenerationException(f"Failed to parse AI response as JSON: {e}")
         except KeyError as e:
@@ -135,11 +140,13 @@ class PlaywrightGenerator(GeneratorInterface):
         """Generate a Playwright instruction from a snapshot and Gherkin step."""
         try:
             # Prepare the prompt
-            prompt = self.prompt_template.replace("{html_snapshot}", snapshot)
+            prompt = self.prompt_template.replace("{web_page_snapshot}", snapshot)
             prompt = prompt.replace("{gherkin_step}", gherkin_step)
+            logger.debug(f"Prompt PlaywrightGenerator: {prompt}")
 
             # Get response from AI
             response = await self.ai_client.send_prompt(prompt)
+            logger.debug(f"Response PlaywrightGenerator: {response}")
 
             # Validate response
             if not await self.validate_response(response.content):
@@ -147,17 +154,47 @@ class PlaywrightGenerator(GeneratorInterface):
 
             # Return the cleaned instruction
             return self._clean_instruction(response.content)
-
+        
+        except AIClientException as e:
+            # Handle AI client specific errors (e.g., rate limits)
+            logger.error(f"AI client error during instruction generation: {e}")
+            raise StepGenerationException(f"AI client error: {str(e)}") from e
+        
         except Exception as e:
             raise StepGenerationException(f"Playwright instruction generation failed: {str(e)}")
 
     async def validate_response(self, response: str) -> bool:
-        """Validate that the response is a valid Playwright instruction."""
-        # Basic validation - can be enhanced based on your needs
-        instruction = self._clean_instruction(response)
-        instruction = instruction.strip()
-        return instruction.startswith("await ") and instruction.endswith(";")
+        """Validate that the response is a valid Playwright selector JSON."""
+        try:
+            # Parse the response as JSON
+            selectors = json.loads(response)
 
+            # Validate structure
+            if not isinstance(selectors, dict):
+                return False
+
+            # Check for required keys
+            if 'high_precision' not in selectors or 'low_precision' not in selectors:
+                return False
+
+            # Validate that both are lists
+            if not (isinstance(selectors['high_precision'], list) and
+                    isinstance(selectors['low_precision'], list)):
+                return False
+
+            # Validate that lists are not empty
+            if not (selectors['high_precision'] or selectors['low_precision']):
+                return False
+
+            return True
+
+        except json.JSONDecodeError:
+            logger.error(f"Invalid JSON response: {response}")
+            return False
+        except Exception as e:
+            logger.error(f"Validation error: {str(e)}")
+            return False
+        
     def _clean_instruction(self, instruction: str) -> str:
         instruction = instruction.strip()
         # Remove code block with language

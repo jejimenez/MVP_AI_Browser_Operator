@@ -41,6 +41,7 @@ class ExecutionResult:
     error_message: Optional[str] = None
     page_url: Optional[str] = None
     execution_time: float = 0.0
+    result: Any = None 
 
 class BrowserManagerInterface(ABC):
     """Abstract interface for browser management."""
@@ -75,6 +76,8 @@ class PlaywrightManager(BrowserManagerInterface):
         # Click actions
         re.compile(r"click\(['\"]([^'\"]+)['\"]\)"),
         re.compile(r"dblclick\(['\"]([^'\"]+)['\"]\)"),
+        # New locator().click() pattern
+        re.compile(r"locator\(['\"](.+?)['\"]\)\.click\(\)"),
 
         # Form interactions
         re.compile(r"fill\(['\"]([^'\"]+)['\"], ['\"]([^'\"]+)['\"]\)"),
@@ -83,14 +86,28 @@ class PlaywrightManager(BrowserManagerInterface):
         re.compile(r"check\(['\"]([^'\"]+)['\"]\)"),
         re.compile(r"uncheck\(['\"]([^'\"]+)['\"]\)"),
         re.compile(r"select_option\(['\"]([^'\"]+)['\"], ['\"]([^'\"]+)['\"]\)"),
+        # New locator().fill/type patterns
+        re.compile(r"locator\(['\"](.+?)['\"]\)\.fill\(['\"](.+?)['\"]\)"),
+        re.compile(r"locator\(['\"](.+?)['\"]\)\.type\(['\"](.+?)['\"]\)"),
+        re.compile(
+            r"locator\(['\"][^'\"]+['\"]\)"
+            r"(?:\.filter\(\{[^\}]+\}\))?"
+            r"(?:\.locator\(['\"][^'\"]+['\"]\))*"
+            r"\.(click|fill|type)\((?:['\"][^'\"]*['\"](?:,\s*['\"][^'\"]*['\"])?)*\)"
+        ),
 
         # Mouse interactions
         re.compile(r"hover\(['\"]([^'\"]+)['\"]\)"),
         re.compile(r"focus\(['\"]([^'\"]+)['\"]\)"),
+        # New locator().hover/focus patterns
+        re.compile(r"locator\(['\"]([^'\"]+)['\"]\)\.hover\(\)"),
+        re.compile(r"locator\(['\"]([^'\"]+)['\"]\)\.focus\(\)"),
 
         # Wait actions
         re.compile(r"wait_for_selector\(['\"]([^'\"]+)['\"]\)"),
-        re.compile(r"wait_for_load_state\(['\"]?([^'\"]+)['\"]?\)"),
+        re.compile(r"wait_for_load_state\(['\"](load|domcontentloaded|networkidle)['\"](?:\s*,\s*timeout=\d+)?\)"),
+        # New locator().wait_for patterns
+        re.compile(r"locator\(['\"]([^'\"]+)['\"]\)\.wait_for\(\)"),
 
         # Keyboard
         re.compile(r"keyboard\.press\(['\"]([^'\"]+)['\"]\)"),
@@ -99,6 +116,11 @@ class PlaywrightManager(BrowserManagerInterface):
         # Expect assertions (for verification)
         re.compile(r"expect\(page\.locator\(['\"]([^'\"]+)['\"]\)\)\.to_be_visible\(\)"),
         re.compile(r"expect\(page\.locator\(['\"]([^'\"]+)['\"]\)\)\.to_have_text\(['\"]([^'\"]+)['\"]\)"),
+        # New locator() expect patterns
+        re.compile(r"expect\(locator\(['\"]([^'\"]+)['\"]\)\)\.to_be_visible\(\)"),
+        re.compile(r"expect\(locator\(['\"]([^'\"]+)['\"]\)\)\.to_have_text\(['\"]([^'\"]+)['\"]\)"),
+
+        re.compile(r"url\(\)")
     }
 
     def __init__(
@@ -207,7 +229,7 @@ class PlaywrightManager(BrowserManagerInterface):
             pattern.match(clean_instruction) is not None
             for pattern in self.ALLOWED_ACTIONS
         )
-
+    
     async def execute_step(self, instruction: str) -> ExecutionResult:
         """
         Execute a Playwright instruction and capture the result.
@@ -227,6 +249,8 @@ class PlaywrightManager(BrowserManagerInterface):
             raise BrowserException("Browser not initialized")
 
         start_time = datetime.now()
+        screenshot_path = None
+        result_value = None  # Add this to store return values
 
         try:
             # Clean up instruction
@@ -235,19 +259,53 @@ class PlaywrightManager(BrowserManagerInterface):
 
             # Check if instruction is allowed
             if not self._is_instruction_allowed(clean_instruction):
-                raise SecurityException(
-                    f"Instruction not allowed: {clean_instruction}"
-                )
+                raise SecurityException(f"Instruction not allowed: {clean_instruction}")
 
-            # Execute the instruction
-            exec_locals = {
-                "page": self._page,
-                "expect": self._page.expect_event,
-                "keyboard": self._page.keyboard
-            }
+            # Special handling for navigation
+            if "goto" in clean_instruction:
+                url = clean_instruction.split("'")[1]
+                await self._page.goto(url, wait_until='networkidle', timeout=30000)
 
-            # Execute with proper context
-            await eval(f"page.{clean_instruction}", {"page": self._page})
+                # Additional waiting for page readiness
+                try:
+                    # Wait for network to be really idle
+                    await self._page.wait_for_load_state('networkidle', timeout=5000)
+                    # Wait for DOM content
+                    await self._page.wait_for_load_state('domcontentloaded')
+
+                    # Site-specific waiting
+                    if "google.com" in url:
+                        await self._page.wait_for_selector('input[name="q"]', timeout=10000)
+
+                    # Verify page loaded correctly
+                    current_url = self._page.url
+                    if not current_url or "about:blank" in current_url:
+                        raise ElementNotFoundException("Page did not load properly")
+
+                except Exception as wait_error:
+                    logger.warning(f"Additional waiting failed: {str(wait_error)}")
+
+            # Handle instructions that return values
+            elif clean_instruction == "url()":
+                result_value = self._page.url
+
+            else:
+                # Execute non-navigation instructions
+                exec_locals = {
+                    "page": self._page,
+                    "expect": self._page.expect_event,
+                    "keyboard": self._page.keyboard
+                }
+
+                # Execute with proper context
+                result_value = await eval(f"page.{clean_instruction}", {"page": self._page})
+
+                # For certain actions, wait for network idle
+                if any(action in clean_instruction for action in ['click', 'type', 'press', 'fill']):
+                    try:
+                        await self._page.wait_for_load_state('networkidle', timeout=5000)
+                    except Exception as wait_error:
+                        logger.debug(f"Post-action waiting skipped: {str(wait_error)}")
 
             # Take screenshot after execution
             screenshot_path = await self._take_screenshot()
@@ -257,7 +315,8 @@ class PlaywrightManager(BrowserManagerInterface):
                 success=True,
                 screenshot_path=screenshot_path,
                 page_url=self._page.url,
-                execution_time=execution_time
+                execution_time=execution_time,
+                result=result_value  # Add the result to the return value
             )
 
         except SecurityException as e:
@@ -267,12 +326,17 @@ class PlaywrightManager(BrowserManagerInterface):
                 screenshot_path=None,
                 error_message=str(e),
                 page_url=self._page.url if self._page else None,
-                execution_time=(datetime.now() - start_time).total_seconds()
+                execution_time=(datetime.now() - start_time).total_seconds(),
+                result=None
             )
 
         except Exception as e:
             logger.error(f"Step execution failed: {str(e)}")
-            screenshot_path = await self._take_screenshot("error")
+            try:
+                # Take screenshot of failure state
+                screenshot_path = await self._take_screenshot("error")
+            except Exception as screenshot_error:
+                logger.error(f"Failed to take error screenshot: {str(screenshot_error)}")
 
             execution_time = (datetime.now() - start_time).total_seconds()
             return ExecutionResult(
@@ -280,21 +344,8 @@ class PlaywrightManager(BrowserManagerInterface):
                 screenshot_path=screenshot_path,
                 error_message=str(e),
                 page_url=self._page.url if self._page else None,
-                execution_time=execution_time
-            )
-
-        except Exception as e:
-            logger.error(f"Step execution failed: {str(e)}")
-            # Take screenshot of failure state
-            screenshot_path = await self._take_screenshot("error")
-
-            execution_time = (datetime.now() - start_time).total_seconds()
-            return ExecutionResult(
-                success=False,
-                screenshot_path=screenshot_path,
-                error_message=str(e),
-                page_url=self._page.url if self._page else None,
-                execution_time=execution_time
+                execution_time=execution_time,
+                result=None
             )
 
     async def _take_screenshot(self, prefix: str = "step") -> Optional[str]:

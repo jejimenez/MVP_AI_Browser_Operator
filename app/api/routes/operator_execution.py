@@ -1,4 +1,4 @@
-# app/api/routes/test_execution.py
+# app/api/routes/operator_execution.py
 
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from typing import List, Optional
@@ -14,9 +14,9 @@ from app.schemas.responses import (
     TestExecutionStatus,
     TestSuiteResponse
 )
-from app.services.test_runner import (
-    TestRunnerInterface,
-    create_test_runner,  # Changed from TestRunnerFactory
+from app.services.operator_runner import (
+    OperatorRunnerInterface,
+    create_operator_runner,  # Changed from TestRunnerFactory
     StepExecutionResult
 )
 from app.api.dependencies import (
@@ -30,9 +30,9 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 # Update the dependency
-def get_test_runner() -> TestRunnerInterface:
+def get_operator_runner() -> OperatorRunnerInterface:
     """Dependency for getting test runner instance."""
-    return create_test_runner()
+    return create_operator_runner()
 
 @router.post(
     "/execute",
@@ -40,10 +40,10 @@ def get_test_runner() -> TestRunnerInterface:
     summary="Execute a single test case",
     description="Execute a test case with given steps and URL"
 )
-async def execute_test_case(
+async def execute_operator_case(
     request: TestCaseRequest,
     background_tasks: BackgroundTasks,
-    test_runner: TestRunnerInterface = Depends(get_test_runner),
+    test_runner: OperatorRunnerInterface = Depends(get_operator_runner),
     tenant_id: str = Depends(get_current_tenant),
     api_key: str = Depends(validate_api_key)
 ) -> TestCaseResponse:
@@ -59,21 +59,21 @@ async def execute_test_case(
     """
     try:
         # Validate test case
-        if not await test_runner.validate_test_case(request.test_steps):
+        if not await test_runner.validate_operator_case(request.test_steps):
             raise HTTPException(
                 status_code=400,
                 detail="Invalid test case format or steps"
             )
 
         # Execute test case
-        result = await test_runner.run_test_case(
+        result = await test_runner.run_operator_case(
             url=request.url,
             test_steps=request.test_steps
         )
 
         # Schedule cleanup in background
         background_tasks.add_task(
-            cleanup_test_artifacts,
+            cleanup_operator_artifacts,
             result.steps_results
         )
 
@@ -109,17 +109,17 @@ async def execute_test_case(
     summary="Execute test case from file",
     description="Execute a test case from an uploaded file"
 )
-async def execute_test_case_from_file(
+async def execute_operator_case_from_file(
     request: TestCaseFileRequest,
-    test_runner: TestRunnerInterface = Depends(get_test_runner),
+    test_runner: OperatorRunnerInterface = Depends(get_operator_runner),
     tenant_id: str = Depends(get_current_tenant)
 ) -> TestCaseResponse:
     """Execute test case from uploaded file."""
     try:
         # Read and parse file content
-        test_steps = await parse_test_file(request.file)
+        test_steps = await parse_operator_file(request.file)
 
-        return await execute_test_case(
+        return await execute_operator_case(
             TestCaseRequest(
                 url=request.url,
                 test_steps=test_steps
@@ -148,7 +148,7 @@ async def get_execution_status(
     """Get status of a test execution."""
     try:
         # Retrieve status from storage/cache
-        status = await get_test_status(execution_id, tenant_id)
+        status = await get_operator_status(execution_id, tenant_id)
 
         if not status:
             raise HTTPException(
@@ -171,10 +171,10 @@ async def get_execution_status(
     summary="Execute test suite",
     description="Execute multiple test cases as a suite"
 )
-async def execute_test_suite(
+async def execute_operator_suite(
     request: TestSuiteRequest,
     background_tasks: BackgroundTasks,
-    test_runner: TestRunnerInterface = Depends(get_test_runner),
+    test_runner: OperatorRunnerInterface = Depends(get_operator_runner),
     tenant_id: str = Depends(get_current_tenant)
 ) -> TestSuiteResponse:
     """Execute multiple test cases as a suite."""
@@ -183,7 +183,7 @@ async def execute_test_suite(
         suite_results = []
 
         for test_case in request.test_cases:
-            result = await execute_test_case(
+            result = await execute_operator_case(
                 test_case,
                 background_tasks,
                 test_runner,
@@ -213,7 +213,7 @@ async def execute_test_suite(
         )
 
 # Helper functions
-async def cleanup_test_artifacts(step_results: List[StepExecutionResult]) -> None:
+async def cleanup_operator_artifacts(step_results: List[StepExecutionResult]) -> None:
     """Clean up screenshots and other artifacts after test execution."""
     try:
         for result in step_results:
@@ -223,7 +223,7 @@ async def cleanup_test_artifacts(step_results: List[StepExecutionResult]) -> Non
     except Exception as e:
         logger.error(f"Cleanup failed: {str(e)}", exc_info=True)
 
-async def parse_test_file(file: bytes) -> str:
+async def parse_operator_file(file: bytes) -> str:
     """Parse test steps from uploaded file."""
     try:
         # Implement file parsing logic
@@ -234,7 +234,7 @@ async def parse_test_file(file: bytes) -> str:
             detail=f"Invalid file format: {str(e)}"
         )
 
-async def get_test_status(
+async def get_operator_status(
     execution_id: str,
     tenant_id: str
 ) -> Optional[TestExecutionStatus]:

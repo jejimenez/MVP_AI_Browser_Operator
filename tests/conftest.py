@@ -1,12 +1,11 @@
 # tests/conftest.py
 
 import pytest
-import asyncio
 from fastapi.testclient import TestClient
 from typing import Generator, Dict
 
 from app.main import app
-from app.services.test_runner import TestRunnerInterface
+from app.services.operator_runner import OperatorRunnerInterface
 from app.infrastructure.playwright_manager import BrowserManagerInterface
 from app.infrastructure.ai_client import AIClientInterface
 
@@ -30,7 +29,7 @@ def sample_test_case() -> str:
 # Mock fixtures
 @pytest.fixture
 def mock_test_runner(mocker):
-    return mocker.Mock(spec=TestRunnerInterface)
+    return mocker.Mock(spec=OperatorRunnerInterface)
 
 @pytest.fixture
 def mock_browser_manager(mocker):
@@ -39,10 +38,3 @@ def mock_browser_manager(mocker):
 @pytest.fixture
 def mock_ai_client(mocker):
     return mocker.Mock(spec=AIClientInterface)
-
-# Async fixtures
-@pytest.fixture
-def event_loop():
-    loop = asyncio.get_event_loop()
-    yield loop
-    loop.close()

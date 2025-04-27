@@ -65,7 +65,6 @@ class AbacusAIClient(AIClientInterface):
             # Extract content from the response
             # Note: Adjust the key based on actual SDK response structure
             content = response.get("content", "").strip()
-            logger.debug(f"AI response: {response}")
 
             if not content:
                 raise AIClientException("Empty response from AI service")

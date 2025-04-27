@@ -40,11 +40,11 @@ class SnapshotParsingException(Exception):
     """Exception for page snapshot parsing errors."""
     pass
 
-class TestExecutionException(Exception):
+class OperatorExecutionException(Exception):
     """Base exception for test execution errors."""
     pass
 
-class StepExecutionException(TestExecutionException):
+class StepExecutionException(OperatorExecutionException):
     """Exception for step execution failures."""
     pass
 
