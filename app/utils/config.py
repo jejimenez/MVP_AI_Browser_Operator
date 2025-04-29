@@ -83,3 +83,53 @@ def get_abacus_config() -> AbacusConfig:
         deployment_id=settings.abacus_deployment_id,
         deployment_token=settings.abacus_deployment_token
     )
+
+HTML_SUMMARIZER_CONFIG = {
+    'role_map': {
+        'a': 'link',
+        'button': 'button',
+        'input': 'textbox',  # Default, overridden by input_type_map
+        'select': 'combobox',
+        'textarea': 'textbox',
+        'h1': 'heading',
+        'h2': 'heading',
+        'h3': 'heading',
+        'h4': 'heading',
+        'h5': 'heading',
+        'h6': 'heading',
+        'div': 'generic',
+        'span': 'generic',
+        'p': 'text',
+        'nav': 'navigation',
+        'form': 'form',
+        'header': 'banner',
+        'footer': 'contentinfo',
+        'main': 'main',
+        'article': 'article',
+        'section': 'region',
+        'aside': 'complementary',
+        'img': 'img',
+        'svg': 'img',
+        'iframe': 'document',
+        'canvas': 'img',
+    },
+    'input_type_map': {
+        'text': 'textbox',
+        'search': 'searchbox',
+        'email': 'textbox',
+        'password': 'textbox',
+        'checkbox': 'checkbox',
+        'radio': 'radio',
+        'submit': 'button',
+        'reset': 'button',
+        'file': 'textbox',
+        'hidden': None,
+        'image': 'button',
+    },
+    'visible_attributes': [
+        'id', 'class', 'href', 'aria-label', 'data-testid', 'role', 'type',
+        'value', 'alt', 'title', 'aria-selected', 'aria-checked',
+        'aria-expanded', 'aria-controls', 'aria-describedby', 'aria-required',
+        'tabindex', 'style', 'src', 'aria-level', 'name', 'placeholder'
+    ]
+}

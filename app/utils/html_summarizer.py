@@ -1,122 +1,296 @@
-from bs4 import BeautifulSoup, Comment, NavigableString
+# app/utils/html_summarizer.py
+from abc import ABC, abstractmethod
+from typing import Dict, Optional, List, Any
+from bs4 import BeautifulSoup, Comment, NavigableString 
+from app.utils.config import HTML_SUMMARIZER_CONFIG
+import logging
 
-def html_to_json_visible(html_content):
+logger = logging.getLogger('app.utils.html_summarizer')
+
+class HTMLSummarizerInterface(ABC):
+    """Abstract interface for HTML summarizers."""
+    @abstractmethod
+    def html_to_json_visible(self, html_content: str) -> Dict[str, Any]:
+        """Convert HTML to JSON DOM for visible elements."""
+        pass
+
+class HTMLSummarizer(HTMLSummarizerInterface):
+    """Converts HTML to a JSON DOM for visible elements, compatible with Playwright.
+
+    Responsibilities:
+    - Parse HTML using a configurable parser (default: lxml).
+    - Filter visible elements based on style and attributes.
+    - Map tags to accessibility roles and extract names.
+    - Produce a JSON structure for AI-driven Playwright instructions.
     """
-    Convert HTML content to a JSON representation, including only visible elements.
-    Produces a structure similar to Playwright's accessibility snapshot with roles, names, and attributes.
-    
-    Args:
-        html_content (str): HTML string (e.g., from get_html).
-    
-    Returns:
-        dict: JSON representation of visible DOM elements.
-    """
-    def is_visible(element):
-        """Check if an element is visible (not hidden by CSS or attributes)."""
+    def __init__(self, parser: str = 'lxml', config: Dict = HTML_SUMMARIZER_CONFIG):
+        """Initialize with parser and configuration.
+
+        Args:
+            parser: BeautifulSoup parser ('lxml', 'html5lib', etc.).
+            config: Configuration dict with role_map, input_type_map, and visible_attributes.
+        """
+        self.parser = parser
+        self.role_map = config['role_map']
+        self.input_type_map = config['input_type_map']
+        self.visible_attributes = config['visible_attributes']
+
+    def is_visible(self, element: BeautifulSoup) -> bool:
+        """Check if an element is visible based on style, attributes, or content.
+
+        Args:
+            element: BeautifulSoup element to check.
+
+        Returns:
+            bool: True if the element is visible, False otherwise.
+        """
+        logger.debug(f"Checking visibility for element: {element.name}, attrs: {element.attrs}")
         if isinstance(element, (Comment, NavigableString)):
+            logger.debug("Skipping comment or string")
             return False
         style = element.get('style', '')
-        if 'display: none' in style or 'visibility: hidden' in style:
+        if 'display: none' in style or 'visibility: hidden' in style or 'opacity: 0' in style:
+            logger.debug("Invisible due to style")
             return False
         if element.get('hidden') or element.get('aria-hidden') == 'true':
+            logger.debug("Invisible due to hidden or aria-hidden")
             return False
-        # Check if element has meaningful content (text or interactive)
+        interactive = element.name in ['a', 'button', 'input', 'select', 'textarea'] or \
+                      element.get('role') in ['button', 'link', 'textbox', 'combobox', 'menuitem', 'tab']
+        if interactive:
+            logger.debug("Visible as interactive element")
+            return True
+        if element.name in ['img', 'svg', 'canvas', 'iframe']:
+            logger.debug("Visible as special element")
+            return True
         text = element.get_text(strip=True)
-        interactive = element.name in ['a', 'button', 'input', 'select', 'textarea'] or element.get('role') in ['button', 'link', 'textbox', 'combobox']
-        return bool(text or interactive or element.find_all(recursive=False))
+        if not text and not element.find_all(recursive=False):
+            logger.debug("Invisible: no text or children")
+            return False
+        if element.find_all(recursive=False):
+            for child in element.find_all(recursive=False):
+                if self.is_visible(child):
+                    logger.debug("Visible due to visible child")
+                    return True
+        return bool(text)
 
-    def tag_to_role(tag_name, element):
-        """Map HTML tag to ARIA role, similar to Playwright's accessibility snapshot."""
-        role_map = {
-            'a': 'link',
-            'button': 'button',
-            'input': 'textbox' if element.get('type') in ['text', 'search', 'email', 'password'] else 'checkbox' if element.get('type') == 'checkbox' else 'radio' if element.get('type') == 'radio' else None,
-            'select': 'combobox',
-            'textarea': 'textbox',
-            'h1': 'heading',
-            'h2': 'heading',
-            'h3': 'heading',
-            'h4': 'heading',
-            'h5': 'heading',
-            'h6': 'heading',
-            'div': 'generic',
-            'span': 'generic',
-            'p': 'text',
-            'nav': 'navigation',
-            'form': 'form',
-            'search': 'searchbox'
-        }
-        # Use explicit role attribute if present
+    def tag_to_role(self, tag_name: str, element: BeautifulSoup) -> Optional[str]:
+        """Map an HTML tag to an accessibility role.
+
+        Args:
+            tag_name: HTML tag name (e.g., 'div', 'input').
+            element: BeautifulSoup element with attributes.
+
+        Returns:
+            Optional[str]: Accessibility role, or None for invalid elements.
+        """
         if element.get('role'):
+            logger.debug(f"Using explicit role: {element['role']}")
             return element['role']
-        return role_map.get(tag_name.lower(), 'generic')
+        tag_name = tag_name.lower()
+        if tag_name == 'input':
+            input_type = element.get('type', 'text')
+            role = self.input_type_map.get(input_type, 'textbox')
+            logger.debug(f"Input type {input_type} mapped to role: {role}")
+            return role
+        role = self.role_map.get(tag_name, 'generic')
+        logger.debug(f"Tag {tag_name} mapped to role: {role}")
+        return role
 
-    def element_to_json(element):
-        """Recursively convert a BeautifulSoup element to JSON."""
-        if not is_visible(element):
+    def get_name(self, element: BeautifulSoup, text: str) -> str:
+        """Extract an accessible name for an element.
+
+        Args:
+            element: BeautifulSoup element to process.
+            text: Pre-computed text content of the element.
+
+        Returns:
+            str: Accessible name, or empty string if none found.
+        """
+        logger.debug(f"Getting name for element: {element.name}, text: {text}, attrs: {element.attrs}")
+        if not hasattr(element, 'attrs'):
+            logger.warning(f"Element {element} has no attributes")
+            return ''
+
+        # Robust aria-label check
+        aria_label = element.get('aria-label', '').strip()
+        if not aria_label:
+            for attr in element.attrs:
+                if attr.lower() == 'aria-label':
+                    aria_label = element.attrs[attr].strip()
+                    break
+        if aria_label:
+            logger.debug(f"Name from aria-label: {aria_label}")
+            return aria_label
+
+        # Direct text for non-generic roles
+        role = self.tag_to_role(element.name, element)
+        direct_text = element.string.strip() if element.string else ''
+        if direct_text and role != 'generic':
+            logger.debug(f"Name from direct text: {direct_text}")
+            return direct_text
+
+        # Child text for generic roles without child elements
+        if role == 'generic':
+            child_elements = element.find_all(recursive=False)
+            if not child_elements and text:
+                logger.debug(f"Name from child text for generic role: {text}")
+                return text
+            logger.debug(f"Skipping child text for generic role with {len(child_elements)} children")
+
+        # Special cases
+        if element.name == 'img':
+            name = element.get('alt', '').strip()
+            logger.debug(f"Name from alt: {name}")
+            return name
+        if element.name in ['input', 'textarea', 'select']:
+            name = (element.get('aria-label', '').strip() or
+                    element.get('value', '').strip() or
+                    element.get('name', '').strip() or  # Added for flexibility
+                    element.get('placeholder', '').strip())
+            logger.debug(f"Name for input/textarea/select: {name}")
+            return name
+        if element.name == 'iframe':
+            name = element.get('title', '').strip()
+            logger.debug(f"Name from title: {name}")
+            return name
+
+        logger.debug("No name found")
+        return ''
+
+    def element_to_json(self, element: BeautifulSoup) -> Optional[Dict[str, Any]]:
+        """Convert an element to JSON representation.
+
+        Args:
+            element: BeautifulSoup element to convert.
+
+        Returns:
+            Optional[Dict]: JSON node, or None if invisible or invalid.
+        """
+        if not self.is_visible(element):
+            logger.debug(f"Skipping invisible element: {element.name}")
             return None
-        
-        # Extract text content (visible text only)
+        if not element.name:
+            logger.warning(f"Skipping element with no tag name: {element}")
+            return None
+
         text = element.get_text(strip=True)
-        # Map tag to ARIA role
-        role = tag_to_role(element.name, element)
-        # Extract relevant attributes
+        role = self.tag_to_role(element.name, element)
+        if role is None:
+            logger.debug(f"Filtering out element with no role: {element.name}")
+            return None
+
         attributes = {
             key: value for key, value in element.attrs.items()
-            if key in ['id', 'class', 'href', 'aria-label', 'data-testid', 'role', 'type', 'value']
+            if key in self.visible_attributes
         }
-        if 'class' in attributes:
-            attributes['class'] = ' '.join(attributes['class']) if isinstance(attributes['class'], list) else attributes['class']
-        
-        # Determine name (text, aria-label, or value)
-        name = element.get('aria-label', text or element.get('value', ''))
-        
-        # Build JSON node
-        node = {
-            'role': role,
-            'name': name,
-        }
+        if 'class' in attributes and isinstance(attributes['class'], list):
+            attributes['class'] = ' '.join(attributes['class'])
+        logger.debug(f"Attributes for {element.name}: {attributes}")
+
+        name = self.get_name(element, text)
+        node = {'role': role, 'name': name}
         if attributes:
             node['attributes'] = attributes
+
+        # Heading level
         if role == 'heading':
-            node['level'] = int(element.name[1]) if element.name.startswith('h') and element.name[1].isdigit() else 1
-        if element.get('focused') == 'true' or element.name in ['input', 'textarea'] and element == element.find_parent().find(focus=True):
+            if 'aria-level' in attributes:
+                try:
+                    node['level'] = int(attributes['aria-level'])
+                except ValueError:
+                    node['level'] = 1
+                    logger.debug(f"Invalid aria-level: {attributes['aria-level']}, defaulting to 1")
+            else:
+                node['level'] = int(element.name[1]) if element.name.startswith('h') and element.name[1].isdigit() else 1
+            logger.debug(f"Assigned heading level: {node['level']}")
+
+        # Focused state
+        if element.get('focused') == 'true' or (
+            element.name in ['input', 'textarea'] and
+            element == element.find_parent().find(focus=True)
+        ):
             node['focused'] = True
+
+        # Popup
         if element.get('haspopup'):
             node['haspopup'] = element['haspopup']
-        
-        # Process children
-        children = []
-        for child in element.find_all(recursive=False):
-            child_json = element_to_json(child)
-            if child_json:
-                children.append(child_json)
+
+        # Children
+        children = [
+            child_json for child in element.find_all(recursive=False)
+            if (child_json := self.element_to_json(child))
+        ]
         if children:
             node['children'] = children
-        
-        # Add text nodes for non-empty text content
-        if text and role == 'text':
-            node = {'role': 'text', 'name': text}
-        
-        return node if node.get('children') or node.get('name') or node.get('role') != 'generic' else None
 
-    try:
-        # Parse HTML with BeautifulSoup
-        soup = BeautifulSoup(html_content, 'html.parser')
-        # Find the root element (e.g., body or specific div)
+        # Text role override
+        if text and role == 'text' and text != name and 'aria-label' not in attributes:
+            node = {'role': 'text', 'name': text}
+            logger.debug(f"Overwriting name for role=text to: {text}")
+
+        logger.debug(f"Processed element: {element.name}, role: {role}, name: {node['name']}, children: {len(children)}")
+        return node
+
+    def html_to_json_visible(self, html_content: str) -> Dict[str, Any]:
+        """Convert HTML to JSON DOM for visible elements.
+
+        Args:
+            html_content: HTML string to process.
+
+        Returns:
+            Dict: JSON representation of visible DOM elements.
+
+        Raises:
+            ValueError: If html_content is None.
+        """
+        if html_content is None:
+            logger.error("html_content is None")
+            raise ValueError("html_content cannot be None")
+
+        try:
+            soup = BeautifulSoup(html_content, self.parser)
+            logger.debug(f"Parsed HTML with {self.parser}")
+        except Exception as e:  # Replaced ParserError with Exception
+            logger.warning(f"Parsing error with {self.parser}: {str(e)}. Falling back to html5lib.")
+            try:
+                soup = BeautifulSoup(html_content, 'html5lib')
+                logger.debug("Parsed HTML with html5lib fallback")
+            except Exception as fallback_e:
+                logger.error(f"Fallback parser failed: {str(fallback_e)}")
+                return {'role': 'WebArea', 'name': '', 'children': []}
+
         root = soup.find('body') or soup
         if not root:
+            logger.warning("No body or root element found in HTML")
             return {'role': 'WebArea', 'name': '', 'children': []}
-        
-        # Convert to JSON
-        json_result = element_to_json(root)
+
+        json_result = self.element_to_json(root)
+        title = soup.title.get_text(separator=' ', strip=True) if soup.title else ''
+        logger.debug(f"Title extracted: {title}")
+
         if not json_result:
-            json_result = {'role': 'WebArea', 'name': soup.title.string if soup.title else '', 'children': []}
-        else:
-            json_result['role'] = 'WebArea'
-            json_result['name'] = soup.title.string if soup.title else ''
-        
+            return {'role': 'WebArea', 'name': title, 'children': []}
+
+        json_result['role'] = 'WebArea'
+        json_result['name'] = title
         return json_result
-    except Exception as e:
-        print(f"Error in html_to_json_visible: {e}")
-        return {'role': 'WebArea', 'name': '', 'children': []}
+
+    def load_test_html(self, file_path: str) -> str:
+        """Load HTML from a file for testing.
+
+        Args:
+            file_path: Path to the HTML file.
+
+        Returns:
+            str: HTML content.
+
+        Raises:
+            FileNotFoundError: If the file is not found.
+        """
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return f.read()
+        except FileNotFoundError as e:
+            logger.error(f"Test HTML file not found: {file_path}")
+            raise

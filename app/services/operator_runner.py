@@ -4,8 +4,10 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Optional, Any
 from dataclasses import dataclass
 from datetime import datetime
+from dotenv import load_dotenv
 import json
 import uuid
+import os # Import the os module
 
 from app.infrastructure.playwright_manager import (
     create_browser_manager,
@@ -28,6 +30,7 @@ from app.domain.exceptions import (
 from app.utils.html_summarizer import html_to_json_visible
 
 logger = get_logger(__name__)
+load_dotenv()
 
 @dataclass
 class StepExecutionResult:
@@ -236,7 +239,7 @@ class OperatorRunnerService(OperatorRunnerInterface):
             error_message=error_message,
             metadata=metadata
         )
-    
+
     async def _wait_for_page_ready(self) -> None:
         """Wait for page to be fully loaded and rendered."""
         try:
@@ -249,7 +252,7 @@ class OperatorRunnerService(OperatorRunnerInterface):
             # Wait for DOM to be ready
             await self._browser_manager.execute_step("wait_for_load_state('domcontentloaded')")
         except Exception as e:
-                logger.warning(f"Page ready wait failed: {str(e)}")
+            logger.warning(f"Page ready wait failed: {str(e)}")
 
     async def _execute_single_step(
         self,
@@ -262,8 +265,20 @@ class OperatorRunnerService(OperatorRunnerInterface):
             snapshot_before = await self._browser_manager.get_page_content()
             snapshot_json = html_to_json_visible(snapshot_before)
 
+            # Save training data to JSONL file
+            #with open("snapshot_before.jsonl", mode='w', encoding='utf-8') as jsonl_file:
+            #    for entry in snapshot_before:
+            #        jsonl_file.write(entry)
+            # Save training data to JSONL file
+            with open("snapshot_json.jsonl", mode='w', encoding='utf-8') as jsonl_file:
+                for entry in snapshot_json:
+                    jsonl_file.write(entry)
+
+            logger.debug("Training data saved to 'snapshot_json.jsonl'")
+
             #logger.debug(f"snapshot_before > {snapshot_before}")
             logger.debug(f"snapshot_json > {snapshot_json}")
+            exit()
 
             try:
                 # Generate Playwright instruction JSON
@@ -275,11 +290,11 @@ class OperatorRunnerService(OperatorRunnerInterface):
                 # Parse and try instructions
                 try:
                     instruction_data = json.loads(instruction_json)
-                    
+
                     # Try each instruction in order until one succeeds
                     last_error = None
                     executed_instruction = None
-                    
+
                     # Try high precision instructions first
                     for instruction in instruction_data.get("high_precision", []):
                         try:
@@ -307,10 +322,10 @@ class OperatorRunnerService(OperatorRunnerInterface):
                                 logger.debug(f"Low precision instruction failed: {str(e)}")
                                 continue
 
-                    if not executed_instruction:
-                        raise StepGenerationException(
-                            f"All instructions failed. Last error: {str(last_error)}"
-                        )
+                        if not executed_instruction:
+                            raise StepGenerationException(
+                                f"All instructions failed. Last error: {str(last_error)}"
+                            )
 
                     logger.debug(f"Successfully executed instruction > {executed_instruction}")
 
@@ -364,7 +379,7 @@ class OperatorRunnerFactory:
     @staticmethod
     def create_runner(
         browser_config: Optional[BrowserConfig] = None,
-        ai_client_type: str = "abacus",
+        ai_client_type: Optional[str] = None, # Make ai_client_type Optional
         headless: bool = True,
         **kwargs
     ) -> OperatorRunnerInterface:
@@ -389,6 +404,9 @@ class OperatorRunnerFactory:
                 screenshot_dir=kwargs.get('screenshot_dir', 'screenshots'),
                 trace_dir=kwargs.get('trace_dir', 'traces')
             )
+        
+        # Use environment variable, default to "abacus" if not set
+        ai_client_type = ai_client_type or os.getenv("AI_CLIENT_TYPE", "abacus") 
 
         return OperatorRunnerService(
             browser_config=browser_config,
@@ -396,7 +414,10 @@ class OperatorRunnerFactory:
         )
 
     @staticmethod
-    def create_debug_runner(**kwargs) -> OperatorRunnerInterface:
+    def create_debug_runner(
+        ai_client_type: Optional[str] = None, # Make ai_client_type Optional
+        **kwargs
+        ) -> OperatorRunnerInterface:
         """
         Create a runner configured for debugging (non-headless, longer timeouts).
         """
@@ -404,12 +425,18 @@ class OperatorRunnerFactory:
             headless=False,
             viewport_width=kwargs.get('viewport_width', 1280),
             viewport_height=kwargs.get('viewport_height', 530),
-            timeout=60000,  # Longer timeout for debugging
+            timeout=10000,  # Longer timeout for debugging
             screenshot_dir='debug_screenshots',
             trace_dir='debug_traces',
             **kwargs
         )
-        return OperatorRunnerService(browser_config=browser_config)
+        # Use environment variable, default to "abacus" if not set
+        ai_client_type = ai_client_type or os.getenv("AI_CLIENT_TYPE", "abacus") 
+
+        return OperatorRunnerService(
+            browser_config=browser_config,
+            ai_client_type=ai_client_type
+        )
 
     @staticmethod
     def create_test_runner(**kwargs) -> OperatorRunnerInterface:
@@ -423,8 +450,9 @@ class OperatorRunnerFactory:
             trace_dir='test_traces',
             **kwargs
         )
+        # ai_client_type is picked up from env variable
         return OperatorRunnerService(browser_config=browser_config)
-    
+
     @staticmethod
     def create_production_runner(**kwargs) -> OperatorRunnerInterface:
         """Create a runner configured for production use."""
@@ -435,6 +463,7 @@ class OperatorRunnerFactory:
             trace_dir='production_traces',
             **kwargs
         )
+        # ai_client_type is picked up from env variable
         return OperatorRunnerService(browser_config=browser_config)
 
     @staticmethod
@@ -446,12 +475,18 @@ class OperatorRunnerFactory:
             viewport_height=812,  # iPhone X dimensions
             **kwargs
         )
+        # ai_client_type is picked up from env variable
         return OperatorRunnerService(browser_config=browser_config)
 
 def create_operator_runner(
     browser_config: Optional[BrowserConfig] = None,
-    ai_client_type: str = "abacus"
+    ai_client_type: Optional[str] = None # Make ai_client_type Optional here too
 ) -> OperatorRunnerInterface:
+    """
+    Creates an OperatorRunnerService instance.
+    """
+    # Use environment variable, default to "abacus" if not set
+    ai_client_type = ai_client_type or os.getenv("AI_CLIENT_TYPE", "abacus")
     return OperatorRunnerService(
         browser_config=browser_config,
         ai_client_type=ai_client_type

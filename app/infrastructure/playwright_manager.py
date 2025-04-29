@@ -5,7 +5,6 @@ from typing import Optional, Dict, Any, List, AsyncGenerator
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from app.utils.html_summarizer import html_to_json_visible
 from app.domain.exceptions import SecurityException
 from typing import Set, Pattern
 import re
@@ -93,7 +92,7 @@ class PlaywrightManager(BrowserManagerInterface):
             r"locator\(['\"][^'\"]+['\"]\)"
             r"(?:\.filter\(\{[^\}]+\}\))?"
             r"(?:\.locator\(['\"][^'\"]+['\"]\))*"
-            r"\.(click|fill|type)\((?:['\"][^'\"]*['\"](?:,\s*['\"][^'\"]*['\"])?)*\)"
+            r"\.(click|fill|type|press)\((?:['\"][^'\"]*['\"](?:,\s*['\"][^'\"]*['\"])?)*\)"
         ),
 
         # Mouse interactions

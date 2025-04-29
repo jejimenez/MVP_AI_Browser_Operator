@@ -1,33 +1,43 @@
-# app/infrastructure/ai_client.py
-
+"""
+Modified ai_client.py to include Gemini API integration.
+"""
 import os
 import logging
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 from dotenv import load_dotenv
 from abacusai import ApiClient
+import requests
 
 from app.infrastructure.interfaces import AIClientInterface, AIResponse
 from app.utils.logger import get_logger
 from app.domain.exceptions import AIClientException
 
+# Use a type alias for better readability
+JSONType = Dict[str, Any]
+
 logger = get_logger(__name__)
 load_dotenv()
 
+
+
 class AbacusAIClient(AIClientInterface):
     """Implementation of AIClientInterface using Abacus.AI SDK."""
+
+    DEFAULT_MODEL_NAME = "claude-3-sonnet"  # Class-level default
 
     def __init__(
         self,
         api_key: Optional[str] = None,
         model_name: str = "claude-3-sonnet",
         max_tokens: int = 1000,
-        temperature: float = 0.7
+        temperature: float = 0.7,
+        **kwargs: Any,  # Add kwargs for compatibility
     ):
         self._api_key = api_key or os.getenv("ABACUS_API_KEY")
         if not self._api_key:
             raise ValueError("API key must be provided or set in ABACUS_API_KEY environment variable")
 
-        self._model_name = model_name
+        self._model_name = model_name if model_name is not None else self.DEFAULT_MODEL_NAME  # Use default if None
         self._max_tokens = max_tokens
         self._temperature = temperature
 
@@ -109,20 +119,200 @@ class AbacusAIClient(AIClientInterface):
     @temperature.setter
     def temperature(self, value: float):
         """Set temperature."""
-        self._temperature = value
         logger.info(f"Temperature updated to: {value}")
+
+
+
+class GeminiAIClient(AIClientInterface):
+    """Implementation of AIClientInterface for Google Gemini API."""
+
+    DEFAULT_MODEL_NAME = "gemini-2.0-flash"
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model_name: str = "gemini-2.0-flash",  # Use gemini-2.0-flash
+        max_tokens: int = 2048,  #  set a default value
+        temperature: float = 0.7,
+        **kwargs: Any,
+    ):
+        """
+        Initializes the Gemini AI client.
+
+        Args:
+            api_key: The API key for the Gemini API.
+            model_name: The name of the Gemini model to use.
+            max_tokens: Maximum number of tokens in the generated text.
+            temperature: Sampling temperature for the model.
+        """
+        self._api_key = api_key or os.getenv("GEMINI_API_KEY")
+        if not self._api_key:
+            raise ValueError(
+                "API key must be provided or set in GEMINI_API_KEY environment variable"
+            )
+        self._model_name = model_name if model_name is not None else self.DEFAULT_MODEL_NAME  # Use default if None
+        self._max_tokens = max_tokens
+        self._temperature = temperature
+        self._base_url = "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent".format(self._model_name) # Use dynamic url
+
+        logger.info(f"Successfully initialized Gemini API client with model: {self._model_name}")
+
+
+    async def send_prompt(self, prompt: str) -> AIResponse:
+        """
+        Sends a prompt to the Gemini API and retrieves the response.
+
+        Args:
+            prompt: The prompt to send to the API.
+
+        Returns:
+            An AIResponse object containing the generated text.
+
+        Raises:
+            AIClientException: If there is an error communicating with the API.
+        """
+        headers = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": self._api_key,
+        }
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {
+                            "text": prompt
+                        }
+                    ]
+                }
+            ],
+             "safetySettings": [  # Added safety settings as recommended by Google.
+                {
+                    "category": "HARM_CATEGORY_HARASSMENT",
+                    "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+                },
+                {
+                    "category": "HARM_CATEGORY_HATE_SPEECH",
+                    "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+                },
+                {
+                    "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                    "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+                },
+                {
+                    "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                    "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+                }
+            ],
+            "generationConfig": {  # Add a generationConfig object
+                "maxOutputTokens": self._max_tokens,
+                "temperature": self._temperature
+            },
+        }
+
+        logger.debug(f"Sending prompt to Gemini API: {self._base_url}")
+        try:
+            response = requests.post(self._base_url, headers=headers, json=payload)
+            response.raise_for_status()  # Raise for bad status codes
+            data = response.json()
+            logger.debug(f"Received response from Gemini API: {data}")
+            return self._process_response(data)
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Gemini API error: {e}")
+            raise AIClientException(f"Gemini API request failed: {e}.  Check your API endpoint and parameters.  Error Details: {e}.  Response Content: {response.text if hasattr(response, 'text') else 'No response text available.  Status Code: {response.status_code}'}. URL: {response.request.url}")
+        except json.JSONDecodeError as e:
+            logger.error(f"Gemini API error: {e}")
+            raise AIClientException(f"Gemini API response was not valid JSON: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            raise AIClientException(f"An unexpected error occurred: {e}")
+
+    def _process_response(self, response: Dict) -> AIResponse:
+        """
+        Processes the response from the Gemini API into the AIResponse format.
+
+        Args:
+            response: The JSON response from the Gemini API.
+
+        Returns:
+            An AIResponse object.
+
+        Raises:
+            AIClientException: If the response is not in the expected format.
+        """
+        try:
+            # Extract content from the response.  Adjust the path as necessary
+            if (
+                response
+                and response.get("candidates")
+                and len(response.get("candidates", [])) > 0
+                and response["candidates"][0].get("content")
+                and response["candidates"][0]["content"].get("parts")
+                and len(response["candidates"][0]["content"]["parts"]) > 0
+            ):
+                content = response["candidates"][0]["content"]["parts"][0]["text"].strip()
+            else:
+                content = "No response from the API."  # Or handle this as an exception
+
+            if not content:
+                raise AIClientException("Empty response from Gemini API")
+            return AIResponse(
+                content=content,
+                metadata={"model": self._model_name, "raw_response": response},
+            )
+        except KeyError as e:
+            logger.error(f"Missing key in Gemini response: {e}")
+            raise AIClientException(f"Missing key in Gemini API response: {e}")
+        except Exception as e:
+            logger.error(f"Error processing Gemini response: {e}")
+            raise AIClientException(f"Failed to process Gemini API response: {e}")
+
+    @property
+    def model_name(self) -> str:
+        """Get the current model name."""
+        return self._model_name
+
+    @model_name.setter
+    def model_name(self, value: str):
+        """Set the model name."""
+        self._model_name = value
+        logger.info(f"Model name updated to: {value}")
+
+    @property
+    def max_tokens(self) -> int:
+        """Get the current max tokens."""
+        return self._max_tokens
+
+    @max_tokens.setter
+    def max_tokens(self, value: int):
+        """Set max tokens."""
+        self._max_tokens = value
+        logger.info(f"Max tokens updated to: {value}")
+
+    @property
+    def temperature(self) -> float:
+        """Get the current temperature."""
+        return self._temperature
+
+    @temperature.setter
+    def temperature(self, value: float):
+        """Set temperature."""
+        logger.info(f"Temperature updated to: {value}")
+
+
 
 def create_ai_client(
     client_type: str = "abacus",
     api_key: Optional[str] = None,
-    model_name: str = "claude-3-sonnet",
+    model_name: Optional[str] = None,  # Changed to Optional, no default
     max_tokens: int = 1000,
     temperature: float = 0.7,
-    **kwargs
+    **kwargs: Any
 ) -> AIClientInterface:
     """Factory function to create AI clients."""
     clients = {
-        "abacus": AbacusAIClient
+        "abacus": AbacusAIClient,
+        "gemini": GeminiAIClient,
     }
 
     if client_type not in clients:

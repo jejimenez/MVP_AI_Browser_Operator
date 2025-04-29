@@ -67,12 +67,15 @@ class NLToGherkinGenerator(GeneratorInterface):
             # Add debug logging
             logger.debug(f"NLToGherkinGenerator Response: {response.content}")
 
+            clean_content = self._clean_steps(response.content)
+            logger.debug(f"NLToGherkinGenerator clean_content: {clean_content}")
+
             # Validate response format
-            if not await self.validate_response(response.content):
+            if not await self.validate_response(clean_content):
                 raise StepGenerationException("Invalid AI response format")
 
             # Parse JSON response
-            steps_data = json.loads(response.content)
+            steps_data = json.loads(clean_content)
 
             # Convert to GherkinStep objects
             return [
@@ -96,6 +99,18 @@ class NLToGherkinGenerator(GeneratorInterface):
         except Exception as e:
             raise StepGenerationException(f"Step generation failed: {str(e)}")
 
+    def _clean_steps(self, instruction: str) -> str:
+        instruction = instruction.strip()
+        # Remove code block with language
+        if instruction.startswith("```json"):
+            instruction = instruction[len("```json"):].strip()
+            if instruction.endswith("```"):
+                instruction = instruction[:-3].strip()
+        # Remove generic code block
+        elif instruction.startswith("```") and instruction.endswith("```"):
+            instruction = instruction[3:-3].strip()
+        return instruction
+    
     async def validate_response(self, response: str) -> bool:
         """Validate that the response is a properly formatted JSON array."""
         print(f"\nValidating response: {response}")
@@ -142,18 +157,20 @@ class PlaywrightGenerator(GeneratorInterface):
             # Prepare the prompt
             prompt = self.prompt_template.replace("{web_page_snapshot}", snapshot)
             prompt = prompt.replace("{gherkin_step}", gherkin_step)
-            logger.debug(f"Prompt PlaywrightGenerator: {prompt}")
+            #logger.debug(f"Prompt PlaywrightGenerator: {prompt}")
 
             # Get response from AI
             response = await self.ai_client.send_prompt(prompt)
             logger.debug(f"Response PlaywrightGenerator: {response}")
 
+            response_content = self._clean_instruction(response.content)
+
             # Validate response
-            if not await self.validate_response(response.content):
+            if not await self.validate_response(response_content):
                 raise StepGenerationException("Invalid Playwright instruction format")
 
             # Return the cleaned instruction
-            return self._clean_instruction(response.content)
+            return response_content
         
         except AIClientException as e:
             # Handle AI client specific errors (e.g., rate limits)
@@ -200,6 +217,11 @@ class PlaywrightGenerator(GeneratorInterface):
         # Remove code block with language
         if instruction.startswith("```javascript"):
             instruction = instruction[len("```javascript"):].strip()
+            if instruction.endswith("```"):
+                instruction = instruction[:-3].strip()
+        # Remove code block with language
+        if instruction.startswith("```json"):
+            instruction = instruction[len("```json"):].strip()
             if instruction.endswith("```"):
                 instruction = instruction[:-3].strip()
         # Remove generic code block
