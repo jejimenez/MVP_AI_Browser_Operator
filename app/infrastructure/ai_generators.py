@@ -155,7 +155,7 @@ class PlaywrightGenerator(GeneratorInterface):
 
             # Get response from AI
             response = await self.ai_client.send_prompt(prompt)
-            logger.debug(f"Response PlaywrightGenerator: {response}")
+            #logger.debug(f"Response PlaywrightGenerator: {response}")
 
             response_content = self._clean_instruction(response.content)
 

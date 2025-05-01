@@ -5,7 +5,8 @@ from app.utils.config import HTML_SUMMARIZER_CONFIG
 from app.infrastructure.interfaces import HTMLSummarizerInterface
 import logging
 
-logger = logging.getLogger('app.infrastructure.html_summarizer')
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.CRITICAL + 1)
 
 class HTMLSummarizer(HTMLSummarizerInterface):
     """Converts HTML to a JSON DOM for visible elements, compatible with Playwright.

@@ -1,4 +1,5 @@
 # tests/test_data/test_cases/sample_test_case.txt
-Step 1: Enter "jaime.jimenez@example.com" into email field
-Step 2: Enter "Jj13032020*" into password field
+Step 1: Enter "jaime.jimenez@ninjarmm.com" into email field
+Step 2: Enter "desarroll0*" into password field
 Step 3: Click login button
+Step 4: It should show the Multifactor authentication form

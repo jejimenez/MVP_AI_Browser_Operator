@@ -52,3 +52,5 @@ For input:
   "high_precision": ["locator('[data-testid=email-input]').fill('user@example.com')"],
   "low_precision": ["locator('input[type=\"email\"]').fill('user@example.com')"]
 }
+
+Output only the JSON, no explanations.
