@@ -1,4 +1,4 @@
 # tests/test_data/test_cases/sample_test_case.txt
-Step 1: Click login button
-Step 2: Enter "test@example.com" into email field
-Step 3: Click Submit
+Step 1: Enter "jaime.jimenez@example.com" into email field
+Step 2: Enter "Jj13032020*" into password field
+Step 3: Click login button
