@@ -141,6 +141,7 @@ class OperatorRunnerService(OperatorRunnerInterface):
                 try:
                     logger.debug(f"Navigation attempt {attempt + 1}/{max_retries}")
                     # Use 'load' instead of 'networkidle' for more reliable navigation
+                    """
                     nav_result = await self._browser_manager.execute_step(
                         f"goto('{url}', {{ wait_until: 'load', timeout: {self.browser_config.timeout} }})"
                     )
@@ -174,13 +175,21 @@ class OperatorRunnerService(OperatorRunnerInterface):
                     except PlaywrightTimeoutError as wait_error:
                         logger.warning(f"Page readiness check failed: {str(wait_error)}")
                         continue
-
+                        """
+                    nav_result = await self._browser_manager.execute_step(
+                        f"goto('{url}', {{ wait_until: 'load', timeout: {self.browser_config.timeout} }})"
+                    )
+                    snapshot_before = await self._browser_manager.get_page_content()
+                    logger.debug(f"snapshot_before: {snapshot_before}")
+                    await asyncio.sleep(7)
+                    snapshot_before = await self._browser_manager.get_page_content()
+                    logger.debug(f"snapshot_before: {snapshot_before}")
                 except Exception as e:
                     logger.warning(f"Navigation attempt {attempt + 1} failed: {str(e)}")
                     if attempt < max_retries - 1:
                         await asyncio.sleep(2)  # Increased delay for stability
                     continue
-
+                    
             if not navigation_success:
                 raise OperatorExecutionException(
                     f"Failed to navigate to {url} after {max_retries} attempts"
@@ -270,7 +279,7 @@ class OperatorRunnerService(OperatorRunnerInterface):
 
             # Save snapshot
             try:
-                self.snapshot_storage.save_snapshot(snapshot_json)
+                self.snapshot_storage.save_snapshot(snapshot_before)
                 logger.debug("Training data saved via SnapshotStorage")
             except IOError as e:
                 logger.warning(f"Failed to save snapshot: {str(e)}")
