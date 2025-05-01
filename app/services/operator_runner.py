@@ -141,15 +141,19 @@ class OperatorRunnerService(OperatorRunnerInterface):
                 try:
                     logger.debug(f"Navigation attempt {attempt + 1}/{max_retries}")
                     # Use 'load' instead of 'networkidle' for more reliable navigation
-                    """
+
                     nav_result = await self._browser_manager.execute_step(
                         f"goto('{url}', {{ wait_until: 'load', timeout: {self.browser_config.timeout} }})"
                     )
+                    await self._browser_manager.execute_step(
+                        f"page.wait_for_load_state('networkidle', timeout={self.browser_config.timeout})"
+                    ) 
 
                     if not nav_result.success:
                         logger.warning(f"Navigation command failed: {nav_result.error_message}")
                         raise OperatorExecutionException("Navigation command failed")
 
+                    """
                     # Verify current URL
                     url_result = await self._browser_manager.execute_step("url()")
                     current_url = url_result.result
@@ -165,25 +169,17 @@ class OperatorRunnerService(OperatorRunnerInterface):
                     if url not in current_url:
                         logger.warning(f"Expected URL not found. Expected: {url}, Got: {current_url}")
                         continue
+                    """   
 
                     # Wait for page readiness
                     try:
-                        await self._wait_for_page_ready()
+                        #await self._wait_for_page_ready()
                         navigation_success = True
-                        logger.info(f"Successfully navigated to {current_url}")
+                        logger.info(f"Successfully navigated to {url}")
                         break
                     except PlaywrightTimeoutError as wait_error:
                         logger.warning(f"Page readiness check failed: {str(wait_error)}")
                         continue
-                        """
-                    nav_result = await self._browser_manager.execute_step(
-                        f"goto('{url}', {{ wait_until: 'load', timeout: {self.browser_config.timeout} }})"
-                    )
-                    snapshot_before = await self._browser_manager.get_page_content()
-                    logger.debug(f"snapshot_before: {snapshot_before}")
-                    await asyncio.sleep(7)
-                    snapshot_before = await self._browser_manager.get_page_content()
-                    logger.debug(f"snapshot_before: {snapshot_before}")
                 except Exception as e:
                     logger.warning(f"Navigation attempt {attempt + 1} failed: {str(e)}")
                     if attempt < max_retries - 1:
@@ -279,12 +275,12 @@ class OperatorRunnerService(OperatorRunnerInterface):
 
             # Save snapshot
             try:
-                self.snapshot_storage.save_snapshot(snapshot_before)
+                self.snapshot_storage.save_snapshot(snapshot_json)
                 logger.debug("Training data saved via SnapshotStorage")
             except IOError as e:
                 logger.warning(f"Failed to save snapshot: {str(e)}")
 
-            logger.debug(f"snapshot_json > {snapshot_json}")
+            #logger.debug(f"snapshot_json > {snapshot_json}")
 
             try:
                 # Generate Playwright instruction JSON

@@ -146,6 +146,21 @@ class PlaywrightManager(BrowserManagerInterface):
         Path(self.config.screenshot_dir).mkdir(parents=True, exist_ok=True)
         Path(self.config.trace_dir).mkdir(parents=True, exist_ok=True)
 
+
+    @property
+    def page(self) -> Optional[Page]:
+        """
+        Temporary public access to the Playwright Page object for debugging purposes.
+        WARNING: For debugging only. Remove or disable in production code.
+        
+        Returns:
+            Optional[Page]: The current Playwright Page object, or None if not initialized.
+        """
+        logger.debug("Accessing page property for debugging")
+        if self._page is None:
+            logger.warning("Page is None; browser may not be initialized")
+        return self._page
+    
     async def start(self) -> None:
         """
         Start browser session.

@@ -1,5 +1,4 @@
 # tests/test_data/test_cases/sample_test_case.txt
-Step 1: Go to homepage
-Step 2: Click login button
-Step 3: Enter "test@example.com" into email field
-Step 4: Click Submit
+Step 1: Click login button
+Step 2: Enter "test@example.com" into email field
+Step 3: Click Submit
