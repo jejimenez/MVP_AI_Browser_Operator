@@ -14,7 +14,6 @@ from app.infrastructure.ai_generators import (
 from app.infrastructure.ai_client import AIClientInterface, AIResponse
 
 # Test Data
-# Make sure VALID_NL_RESPONSE is properly formatted
 VALID_NL_RESPONSE = json.dumps([
     {
         "gherkin": "Given I am on the login page",
@@ -43,8 +42,12 @@ INVALID_NL_RESPONSE = json.dumps([
     }
 ])
 
-VALID_PLAYWRIGHT_RESPONSE = "await page.click('button#login');"
+VALID_PLAYWRIGHT_RESPONSE = json.dumps({
+    "high_precision": ["await page.click('button#login');"],
+    "low_precision": []
+})
 INVALID_PLAYWRIGHT_RESPONSE = "click('button#login');"  # Missing await page
+
 
 # Fixtures
 @pytest.fixture
@@ -175,6 +178,7 @@ class TestNLToGherkinGenerator:
 
 # Tests for PlaywrightGenerator
 class TestPlaywrightGenerator:
+
     @pytest.mark.asyncio
     async def test_generate_instruction_valid(self, playwright_generator, mock_ai_client):
         """Test generating valid Playwright instruction."""
@@ -185,14 +189,14 @@ class TestPlaywrightGenerator:
         )
 
         # Execute
-        instruction = await playwright_generator.generate_instruction(
+        instruction_json = await playwright_generator.generate_instruction(
             snapshot="<html>...</html>",
             gherkin_step="When I click the login button"
         )
 
         # Assert
-        assert instruction == "await page.click('button#login');"
-        assert instruction.startswith("await page.")
+        instruction_data = json.loads(instruction_json)
+        assert instruction_data["high_precision"][0] == "await page.click('button#login');"
 
     @pytest.mark.asyncio
     async def test_generate_instruction_invalid(self, playwright_generator, mock_ai_client):
@@ -231,29 +235,40 @@ class TestPlaywrightGenerator:
     @pytest.mark.asyncio
     async def test_generate_instruction_with_expect(self, playwright_generator, mock_ai_client):
         """Test generating instruction with expect assertion."""
-        expect_response = "await expect(page.locator('h1')).toHaveText('Dashboard');"
+        expect_response = json.dumps({
+            "high_precision": ["await expect(page.locator('h1')).toHaveText('Dashboard');"],
+            "low_precision": []
+        })
         mock_ai_client.send_prompt.return_value = AIResponse(
             content=expect_response,
             metadata={"foo": "bar"}
         )
 
-        instruction = await playwright_generator.generate_instruction(
+        instruction_json = await playwright_generator.generate_instruction(
             snapshot="<html><h1>Dashboard</h1></html>",
             gherkin_step="Then I should see the Dashboard heading"
         )
 
-        assert instruction == expect_response
-        assert instruction.startswith("await expect")
+        instruction_data = json.loads(instruction_json)
+        assert instruction_data["high_precision"][0] == "await expect(page.locator('h1')).toHaveText('Dashboard');"
+        assert instruction_data["high_precision"][0].startswith("await expect")
 
 # Integration-style tests
 class TestGeneratorIntegration:
+
     @pytest.mark.asyncio
     async def test_full_generation_flow(self, nl_to_gherkin_generator, playwright_generator, mock_ai_client):
         """Test the full flow from NL to Playwright instruction."""
         # Setup mock responses
         mock_ai_client.send_prompt.side_effect = [
             AIResponse(content=VALID_NL_RESPONSE, metadata={"foo": "bar"}),
-            AIResponse(content=VALID_PLAYWRIGHT_RESPONSE, metadata={"foo": "bar"})
+            AIResponse(
+                content=json.dumps({
+                    "high_precision": ["await page.goto('https://example.com/login');"],
+                    "low_precision": []
+                }),
+                metadata={"foo": "bar"}
+            )
         ]
 
         # Generate Gherkin steps
@@ -261,8 +276,10 @@ class TestGeneratorIntegration:
         assert len(steps) > 0
 
         # Generate Playwright instruction for first step
-        instruction = await playwright_generator.generate_instruction(
+        instruction_json = await playwright_generator.generate_instruction(
             snapshot="<html>...</html>",
             gherkin_step=steps[0].gherkin
         )
-        assert instruction.startswith("await page.")
+
+        instruction_data = json.loads(instruction_json)
+        assert instruction_data["high_precision"][0].startswith("await page.")

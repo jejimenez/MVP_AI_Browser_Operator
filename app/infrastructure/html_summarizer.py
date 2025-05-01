@@ -1,18 +1,11 @@
-# app/utils/html_summarizer.py
-from abc import ABC, abstractmethod
+# app/infrastructure/html_summarizer.py
 from typing import Dict, Optional, List, Any
-from bs4 import BeautifulSoup, Comment, NavigableString 
+from bs4 import BeautifulSoup, Comment, NavigableString
 from app.utils.config import HTML_SUMMARIZER_CONFIG
+from app.infrastructure.interfaces import HTMLSummarizerInterface
 import logging
 
-logger = logging.getLogger('app.utils.html_summarizer')
-
-class HTMLSummarizerInterface(ABC):
-    """Abstract interface for HTML summarizers."""
-    @abstractmethod
-    def html_to_json_visible(self, html_content: str) -> Dict[str, Any]:
-        """Convert HTML to JSON DOM for visible elements."""
-        pass
+logger = logging.getLogger('app.infrastructure.html_summarizer')
 
 class HTMLSummarizer(HTMLSummarizerInterface):
     """Converts HTML to a JSON DOM for visible elements, compatible with Playwright.
@@ -36,14 +29,7 @@ class HTMLSummarizer(HTMLSummarizerInterface):
         self.visible_attributes = config['visible_attributes']
 
     def is_visible(self, element: BeautifulSoup) -> bool:
-        """Check if an element is visible based on style, attributes, or content.
-
-        Args:
-            element: BeautifulSoup element to check.
-
-        Returns:
-            bool: True if the element is visible, False otherwise.
-        """
+        """Check if an element is visible based on style, attributes, or content."""
         logger.debug(f"Checking visibility for element: {element.name}, attrs: {element.attrs}")
         if isinstance(element, (Comment, NavigableString)):
             logger.debug("Skipping comment or string")
@@ -75,15 +61,7 @@ class HTMLSummarizer(HTMLSummarizerInterface):
         return bool(text)
 
     def tag_to_role(self, tag_name: str, element: BeautifulSoup) -> Optional[str]:
-        """Map an HTML tag to an accessibility role.
-
-        Args:
-            tag_name: HTML tag name (e.g., 'div', 'input').
-            element: BeautifulSoup element with attributes.
-
-        Returns:
-            Optional[str]: Accessibility role, or None for invalid elements.
-        """
+        """Map an HTML tag to an accessibility role."""
         if element.get('role'):
             logger.debug(f"Using explicit role: {element['role']}")
             return element['role']
@@ -98,15 +76,7 @@ class HTMLSummarizer(HTMLSummarizerInterface):
         return role
 
     def get_name(self, element: BeautifulSoup, text: str) -> str:
-        """Extract an accessible name for an element.
-
-        Args:
-            element: BeautifulSoup element to process.
-            text: Pre-computed text content of the element.
-
-        Returns:
-            str: Accessible name, or empty string if none found.
-        """
+        """Extract an accessible name for an element."""
         logger.debug(f"Getting name for element: {element.name}, text: {text}, attrs: {element.attrs}")
         if not hasattr(element, 'attrs'):
             logger.warning(f"Element {element} has no attributes")
@@ -146,8 +116,8 @@ class HTMLSummarizer(HTMLSummarizerInterface):
         if element.name in ['input', 'textarea', 'select']:
             name = (element.get('aria-label', '').strip() or
                     element.get('value', '').strip() or
-                    element.get('name', '').strip() or  # Added for flexibility
-                    element.get('placeholder', '').strip())
+                    element.get('placeholder', '').strip() or  # Moved placeholder before name
+                    element.get('name', '').strip())
             logger.debug(f"Name for input/textarea/select: {name}")
             return name
         if element.name == 'iframe':
@@ -159,14 +129,7 @@ class HTMLSummarizer(HTMLSummarizerInterface):
         return ''
 
     def element_to_json(self, element: BeautifulSoup) -> Optional[Dict[str, Any]]:
-        """Convert an element to JSON representation.
-
-        Args:
-            element: BeautifulSoup element to convert.
-
-        Returns:
-            Optional[Dict]: JSON node, or None if invisible or invalid.
-        """
+        """Convert an element to JSON representation."""
         if not self.is_visible(element):
             logger.debug(f"Skipping invisible element: {element.name}")
             return None
@@ -232,7 +195,7 @@ class HTMLSummarizer(HTMLSummarizerInterface):
         logger.debug(f"Processed element: {element.name}, role: {role}, name: {node['name']}, children: {len(children)}")
         return node
 
-    def html_to_json_visible(self, html_content: str) -> Dict[str, Any]:
+    def summarize_html(self, html_content: str) -> Dict[str, Any]:
         """Convert HTML to JSON DOM for visible elements.
 
         Args:
@@ -251,7 +214,7 @@ class HTMLSummarizer(HTMLSummarizerInterface):
         try:
             soup = BeautifulSoup(html_content, self.parser)
             logger.debug(f"Parsed HTML with {self.parser}")
-        except Exception as e:  # Replaced ParserError with Exception
+        except Exception as e:
             logger.warning(f"Parsing error with {self.parser}: {str(e)}. Falling back to html5lib.")
             try:
                 soup = BeautifulSoup(html_content, 'html5lib')
@@ -277,17 +240,7 @@ class HTMLSummarizer(HTMLSummarizerInterface):
         return json_result
 
     def load_test_html(self, file_path: str) -> str:
-        """Load HTML from a file for testing.
-
-        Args:
-            file_path: Path to the HTML file.
-
-        Returns:
-            str: HTML content.
-
-        Raises:
-            FileNotFoundError: If the file is not found.
-        """
+        """Load HTML from a file for testing."""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 return f.read()

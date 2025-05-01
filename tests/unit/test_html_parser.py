@@ -1,7 +1,7 @@
 # src/operateXRayTestCases/tests/test_html_parser.py
 import pytest
 from bs4 import BeautifulSoup, Comment, NavigableString
-from app.utils.html_summarizer import HTMLSummarizer
+from app.infrastructure.html_summarizer import HTMLSummarizer
 from pathlib import Path
 
 def create_soup(html):
@@ -28,9 +28,9 @@ def simple_html():
     </html>
     """
 
-def test_html_to_json_visible_basic(simple_html, summarizer):
+def test_summarize_html_basic(simple_html, summarizer):
     """Test basic HTML conversion with visible elements."""
-    result = summarizer.html_to_json_visible(simple_html)
+    result = summarizer.summarize_html(simple_html)
     assert result["role"] == "WebArea"
     assert result["name"] == "Test Page"
     children = result["children"]
@@ -60,7 +60,7 @@ def test_input_element(summarizer):
         <input type="text" value="Input value" aria-label="Search input">
     </body>
     """
-    result = summarizer.html_to_json_visible(html)
+    result = summarizer.summarize_html(html)
     assert len(result["children"]) == 1
     assert result["children"][0] == {
         "role": "textbox",
@@ -70,20 +70,20 @@ def test_input_element(summarizer):
 
 def test_title_edge_cases(summarizer):
     html = "<html><head><title></title></head><body><p>Text</p></body>"
-    result = summarizer.html_to_json_visible(html)
+    result = summarizer.summarize_html(html)
     assert result["name"] == ""
     
     html = "<html><head></head><body><p>Text</p></body>"
-    result = summarizer.html_to_json_visible(html)
+    result = summarizer.summarize_html(html)
     assert result["name"] == ""
     
     html = "<html><head><title>Test <!-- comment --> Page</title></head><body><p>Text</p></body>"
-    result = summarizer.html_to_json_visible(html)
+    result = summarizer.summarize_html(html)
     assert result["name"] == "Test Page"
 
 def test_invisible_elements(summarizer):
     html = "<body><div style='display: none;'>Hidden</div><p>Visible</p></body>"
-    result = summarizer.html_to_json_visible(html)
+    result = summarizer.summarize_html(html)
     assert len(result["children"]) == 1
     assert result["children"][0] == {"role": "text", "name": "Visible"}
 
@@ -101,7 +101,7 @@ def test_role_mapping(summarizer):
         <div role="custom">Custom</div>
     </body>
     """
-    result = summarizer.html_to_json_visible(html)
+    result = summarizer.summarize_html(html)
     children = result["children"]
     assert children[0]["role"] == "link"
     assert children[1]["role"] == "button"
@@ -123,7 +123,7 @@ def test_name_extraction(summarizer):
         <p>Plain text</p>
     </body>
     """
-    result = summarizer.html_to_json_visible(html)
+    result = summarizer.summarize_html(html)
     children = result["children"]
     assert children[0]["name"] == "Custom label"  # aria-label
     assert children[1]["name"] == "Image alt"  # alt
@@ -142,7 +142,7 @@ def test_nested_elements(summarizer):
         </div>
     </body>
     """
-    result = summarizer.html_to_json_visible(html)
+    result = summarizer.summarize_html(html)
     assert result["role"] == "WebArea"
     assert len(result["children"]) == 1
     div = result["children"][0]
@@ -154,11 +154,11 @@ def test_nested_elements(summarizer):
 def test_empty_or_malformed_html(summarizer):
     """Test handling of empty or malformed HTML."""
     # Empty HTML
-    result = summarizer.html_to_json_visible("")
+    result = summarizer.summarize_html("")
     assert result == {"role": "WebArea", "name": "", "children": []}
 
     # Malformed HTML
-    result = summarizer.html_to_json_visible("<div>Unclosed tag")
+    result = summarizer.summarize_html("<div>Unclosed tag")
     assert result["role"] == "WebArea"
     assert result["children"][0]["role"] == "generic"
     assert result["children"][0]["name"] == "Unclosed tag"
@@ -172,7 +172,7 @@ def test_comments_and_strings(summarizer):
         <p>Visible text</p>
     </body>
     """
-    result = summarizer.html_to_json_visible(html)
+    result = summarizer.summarize_html(html)
     assert len(result["children"]) == 1  # Only <p>
     assert result["children"][0] == {"role": "text", "name": "Visible text"}
 
@@ -185,7 +185,7 @@ def test_interactive_elements(summarizer):
         <a href="#"></a>
     </body>
     """
-    result = summarizer.html_to_json_visible(html)
+    result = summarizer.summarize_html(html)
     assert len(result["children"]) == 3
     assert result["children"][0]["role"] == "button"
     assert result["children"][1]["role"] == "button"  # submit input
@@ -198,7 +198,7 @@ def test_attributes_filtering(summarizer):
         <div id="main" class="container primary" data-custom="value" aria-label="Main div">Text</div>
     </body>
     """
-    result = summarizer.html_to_json_visible(html)
+    result = summarizer.summarize_html(html)
     div = result["children"][0]
     assert div["attributes"] == {
         "id": "main",
@@ -215,7 +215,7 @@ def test_heading_levels(summarizer):
         <div role="heading" aria-level="2">Custom</div>
     </body>
     """
-    result = summarizer.html_to_json_visible(html)
+    result = summarizer.summarize_html(html)
     assert result["children"][0]["level"] == 1
     assert result["children"][1]["level"] == 3
     assert result["children"][2]["level"] == 2
@@ -224,7 +224,7 @@ def test_error_handling(summarizer):
     """Test error handling for invalid input."""
     # Simulate parsing error by passing None
     with pytest.raises(ValueError):
-        summarizer.html_to_json_visible(None)
+        summarizer.summarize_html(None)
 
 def test_example_page(summarizer):
     """Test processing of example_page.html with login form."""
@@ -232,7 +232,7 @@ def test_example_page(summarizer):
     html_file = Path(__file__).parent.parent / "test_data" / "snapshots" / "example_page.html"
     html_content = summarizer.load_test_html(str(html_file))
     
-    result = summarizer.html_to_json_visible(html_content)
+    result = summarizer.summarize_html(html_content)
     assert result["role"] == "WebArea"
     assert result["name"] == ""  # No <title> tag
     assert len(result["children"]) == 1  # <div>

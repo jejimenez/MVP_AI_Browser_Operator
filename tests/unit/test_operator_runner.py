@@ -1,9 +1,9 @@
 # tests/unit/test_operator_runner.py
-
 import pytest
 from datetime import datetime
 from unittest.mock import Mock, AsyncMock, patch
 import uuid
+import json
 
 from app.services.operator_runner import (
     OperatorRunnerService,
@@ -17,9 +17,12 @@ from app.domain.exceptions import (
     StepGenerationException,
     ValidationException
 )
+from app.infrastructure.interfaces import HTMLSummarizerInterface
+from app.infrastructure.snapshot_storage import SnapshotStorage
 
-# Test Data# Test Data
+# Test Data
 SAMPLE_HTML = "<html><body><h1>Test Page</h1></body></html>"
+SAMPLE_JSON = {"role": 'WebArea', 'name': '', 'children': [{'role': 'heading', 'name': 'Test Page', 'level': 1}]}
 TEST_URL = "https://example.com"
 TEST_NL_STEPS = "Log in as admin"
 MOCK_SCREENSHOT_PATH = "screenshots/test.png"
@@ -31,8 +34,8 @@ def mock_browser_manager():
     manager.stop = AsyncMock()
     manager.execute_step = AsyncMock(return_value=ExecutionResult(
         success=True,
-        error_message=None,
-        screenshot_path=MOCK_SCREENSHOT_PATH
+        screenshot_path=MOCK_SCREENSHOT_PATH,
+        error_message=None
     ))
     manager.get_page_content = AsyncMock(return_value=SAMPLE_HTML)
     return manager
@@ -63,61 +66,96 @@ def mock_step_generator():
 @pytest.fixture
 def mock_playwright_generator():
     generator = Mock()
-    generator.generate_instruction = AsyncMock(return_value="await page.click('#login-button');")
+    generator.generate_instruction = AsyncMock(return_value=json.dumps({
+        "high_precision": ["await page.click('#login-button');"],
+        "low_precision": []
+    }))
     return generator
+
+@pytest.fixture
+def mock_html_summarizer():
+    summarizer = Mock(spec=HTMLSummarizerInterface)
+    summarizer.summarize_html = Mock(return_value=SAMPLE_JSON)
+    return summarizer
+
+@pytest.fixture
+def mock_snapshot_storage():
+    storage = Mock(spec=SnapshotStorage)
+    storage.save_snapshot = Mock()
+    return storage
 
 @pytest.fixture
 async def test_runner(
     mock_browser_manager,
     mock_step_generator,
-    mock_playwright_generator
+    mock_playwright_generator,
+    mock_html_summarizer,
+    mock_snapshot_storage
 ):
     """Fixture for test runner with mocked dependencies."""
     runner = None
     try:
         with patch('app.services.operator_runner.create_browser_manager', return_value=mock_browser_manager):
-            runner = OperatorRunnerService()
+            runner = OperatorRunnerService(
+                html_summarizer=mock_html_summarizer,
+                snapshot_storage=mock_snapshot_storage
+            )
             # Explicitly set mocked dependencies
             runner.nl_to_gherkin = mock_step_generator
             runner.playwright_generator = mock_playwright_generator
             runner._browser_manager = mock_browser_manager
             yield runner
     finally:
-        # Safe cleanup
         if runner and hasattr(runner, '_browser_manager') and runner._browser_manager is not None:
             await runner._browser_manager.stop()
 
 class TestOperatorRunner:
     @pytest.mark.asyncio
-    async def test_successful_operator_execution(self, test_runner, mock_browser_manager):
+    async def test_successful_operator_execution(self, test_runner, mock_browser_manager, mock_html_summarizer, mock_snapshot_storage):
         """Test successful execution of a test case."""
+        mock_browser_manager.execute_step.side_effect = [
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # goto
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=TEST_URL),  # url
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # wait_for_load_state
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # wait_for_load_state
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=SAMPLE_HTML),  # get_page_content
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # step 1
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=SAMPLE_HTML),  # get_page_content
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # step 2
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=SAMPLE_HTML),  # get_page_content
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None)   # step 3
+        ]
+
         result = await test_runner.run_operator_case(
             url=TEST_URL,
             natural_language_steps=TEST_NL_STEPS
         )
         assert result.success
-        assert len(result.steps_results) == 3
+        assert len(result.steps_results) == 2  # Excludes skipped navigation step
         assert result.error_message is None
         assert isinstance(result.start_time, datetime)
         assert isinstance(result.end_time, datetime)
         assert result.total_duration > 0
         assert isinstance(result.metadata["request_id"], str)
-        # Add screenshot path assertion
         for step_result in result.steps_results:
             assert step_result.execution_result.screenshot_path == MOCK_SCREENSHOT_PATH
+        mock_html_summarizer.summarize_html.assert_called()
+        mock_snapshot_storage.save_snapshot.assert_called_with(SAMPLE_JSON)
 
     @pytest.mark.asyncio
-    async def test_failed_operator_execution(self, test_runner, mock_browser_manager):
+    async def test_failed_operator_execution(self, test_runner, mock_browser_manager, mock_html_summarizer, mock_snapshot_storage):
         """Test handling of a failed step execution."""
-        # Setup mock to fail on second step
         mock_browser_manager.execute_step.side_effect = [
-            ExecutionResult(success=True, error_message=None, screenshot_path=MOCK_SCREENSHOT_PATH),
-            ExecutionResult(success=True, error_message=None, screenshot_path=MOCK_SCREENSHOT_PATH),
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # goto
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=TEST_URL),  # url
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # wait_for_load_state
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # wait_for_load_state
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=SAMPLE_HTML),  # get_page_content (step 2)
             ExecutionResult(
                 success=False,
-                error_message="Element not found",
-                screenshot_path=MOCK_SCREENSHOT_PATH
-            )
+                screenshot_path=MOCK_SCREENSHOT_PATH,
+                error_message="Element not found"
+            )  # step 2 action fails
         ]
 
         result = await test_runner.run_operator_case(
@@ -126,33 +164,27 @@ class TestOperatorRunner:
         )
 
         assert not result.success
-        assert "Element not found" in result.error_message
-        assert len(result.steps_results) == 2  # Should stop after failed step
+        assert result.error_message == "Element not found"
+        assert len(result.steps_results) == 2  # Stops after step 2 fails
         for step_result in result.steps_results:
             assert step_result.execution_result.screenshot_path == MOCK_SCREENSHOT_PATH
-    
+        mock_html_summarizer.summarize_html.call_count == 2
+        mock_snapshot_storage.save_snapshot.call_count == 2
 
     @pytest.mark.asyncio
     async def test_step_generation_failure(self, test_runner, mock_step_generator, mock_browser_manager):
         """Test handling of step generation failure."""
-        # Configure the mock to raise an exception
         mock_step_generator.generate_steps.side_effect = StepGenerationException("AI error")
-
-        # Make sure browser manager is set
         test_runner._browser_manager = mock_browser_manager
 
-        # Execute the test case
         result = await test_runner.run_operator_case(
             url=TEST_URL,
             natural_language_steps=TEST_NL_STEPS
         )
 
-        # Assertions
         assert not result.success
-        assert "AI error" in result.error_message
+        assert "Step generation error: Step generation failed: AI error" in result.error_message
         assert len(result.steps_results) == 0
-
-        # Verify mock interactions
         mock_step_generator.generate_steps.assert_called_once_with(TEST_NL_STEPS)
         mock_browser_manager.start.assert_not_called()
         mock_browser_manager.stop.assert_called_once()
@@ -170,16 +202,30 @@ class TestOperatorRunner:
         assert not result.success
         assert "Browser failed to start" in result.error_message
         assert len(result.steps_results) == 0
+        assert mock_browser_manager.stop.called
 
     @pytest.mark.asyncio
-    async def test_step_execution_tracking(self, test_runner, mock_browser_manager):
+    async def test_step_execution_tracking(self, test_runner, mock_browser_manager, mock_html_summarizer, mock_snapshot_storage):
         """Test proper tracking of step execution results."""
+        mock_browser_manager.execute_step.side_effect = [
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # goto
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=TEST_URL),  # url
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # wait_for_load_state
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # wait_for_load_state
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=SAMPLE_HTML),  # get_page_content
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # step 1
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=SAMPLE_HTML),  # get_page_content
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # step 2
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=SAMPLE_HTML),  # get_page_content
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None)   # step 3
+        ]
+
         result = await test_runner.run_operator_case(
             url=TEST_URL,
             natural_language_steps=TEST_NL_STEPS
         )
 
-        assert len(result.steps_results) == 3
+        assert len(result.steps_results) == 2  # Excludes skipped navigation step
         for step_result in result.steps_results:
             assert isinstance(step_result, StepExecutionResult)
             assert step_result.snapshot_before == SAMPLE_HTML
@@ -188,20 +234,24 @@ class TestOperatorRunner:
             assert isinstance(step_result.end_time, datetime)
             assert step_result.duration > 0
             assert step_result.execution_result.screenshot_path == MOCK_SCREENSHOT_PATH
+        assert mock_html_summarizer.summarize_html.call_count == 2
+        assert mock_snapshot_storage.save_snapshot.call_count == 2
 
     @pytest.mark.asyncio
     async def test_cleanup_on_failure(self, test_runner, mock_browser_manager):
         """Test browser cleanup on test failure."""
-        # Update the error case to include screenshot path
         mock_browser_manager.execute_step.side_effect = Exception("Test error")
 
-        await test_runner.run_operator_case(
+        result = await test_runner.run_operator_case(
             url=TEST_URL,
             natural_language_steps=TEST_NL_STEPS
         )
 
+        assert not result.success
+        assert "Failed to navigate" in result.error_message
+        assert len(result.steps_results) == 0
         mock_browser_manager.stop.assert_called_once()
-
+        
     @pytest.mark.asyncio
     async def test_metadata_tracking(self, test_runner):
         """Test proper tracking of test metadata."""
@@ -212,39 +262,62 @@ class TestOperatorRunner:
 
         assert result.metadata
         assert "request_id" in result.metadata
-        assert uuid.UUID(result.metadata["request_id"])  # Verify it's a valid UUID
+        assert uuid.UUID(result.metadata["request_id"])
 
     @pytest.mark.asyncio
-    async def test_playwright_instruction_generation(self, test_runner, mock_playwright_generator):
+    async def test_playwright_instruction_generation(self, test_runner, mock_browser_manager, mock_playwright_generator):
         """Test generation of Playwright instructions."""
+        mock_browser_manager.execute_step.side_effect = [
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # goto
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=TEST_URL),  # url
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # wait_for_load_state
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # wait_for_load_state
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=SAMPLE_HTML),  # get_page_content (step 1)
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # step 1 action
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=SAMPLE_HTML),  # get_page_content (step 2)
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # step 2 action
+        ]
+        mock_playwright_generator.generate_instruction.side_effect = [
+            json.dumps({
+                "high_precision": ["await page.fill('#username', 'admin');"],
+                "low_precision": []
+            }),  # input step
+            json.dumps({
+                "high_precision": ["await page.click('#login-button');"],
+                "low_precision": []
+            })   # click step
+        ]
+
         result = await test_runner.run_operator_case(
             url=TEST_URL,
             natural_language_steps=TEST_NL_STEPS
         )
 
-        assert len(result.steps_results) == 3
-        for step_result in result.steps_results:
-            assert step_result.playwright_instruction.startswith("await ")
-            assert step_result.playwright_instruction.endswith(";")
-
+        assert len(result.steps_results) == 2
+        for idx, step_result in enumerate(result.steps_results):
+            assert step_result.playwright_instruction
+            if idx == 0:  # input step
+                assert "await page.fill(" in step_result.playwright_instruction
+            else:  # click step
+                assert "await page.click(" in step_result.playwright_instruction
+                
     @pytest.mark.asyncio
     async def test_browser_navigation(self, test_runner, mock_browser_manager):
         """Test initial browser navigation."""
-        # Update execute_step mock to include screenshot path
-        mock_browser_manager.execute_step.return_value = ExecutionResult(
-            success=True,
-            error_message=None,
-            screenshot_path=MOCK_SCREENSHOT_PATH
-        )
+        mock_browser_manager.execute_step.side_effect = [
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # goto
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=TEST_URL),  # url
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # wait_for_load_state
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None)   # wait_for_load_state
+        ]
 
         await test_runner.run_operator_case(
             url=TEST_URL,
             natural_language_steps=TEST_NL_STEPS
         )
 
-        # Verify initial navigation
         mock_browser_manager.execute_step.assert_any_call(
-            f"goto('{TEST_URL}', wait_until='networkidle')"
+            f"goto('{TEST_URL}', {{ wait_until: 'load', timeout: 30000 }})"
         )
 
     @pytest.mark.asyncio
@@ -257,23 +330,31 @@ class TestOperatorRunner:
             natural_language_steps=TEST_NL_STEPS
         )
 
-        # Updated assertions to match the new error message chain
         assert not result.success
-        assert "Step generation failed: No steps were generated" in result.error_message
+        assert "No steps were generated from the natural language input" in result.error_message
         assert len(result.steps_results) == 0
-
-        # Verify mock was called correctly
         mock_step_generator.generate_steps.assert_called_once_with(TEST_NL_STEPS)
 
     @pytest.mark.asyncio
     async def test_screenshot_path_tracking(self, test_runner, mock_browser_manager):
         """Test proper tracking of screenshot paths."""
+        mock_browser_manager.execute_step.side_effect = [
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # goto
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=TEST_URL),  # url
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # wait_for_load_state
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # wait_for_load_state
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=SAMPLE_HTML),  # get_page_content (step 1)
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # step 1 action
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=SAMPLE_HTML),  # get_page_content (step 2)
+            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # step 2 action
+        ]
+
         result = await test_runner.run_operator_case(
             url=TEST_URL,
             natural_language_steps=TEST_NL_STEPS
         )
 
-        assert len(result.steps_results) == 3
+        assert len(result.steps_results) == 2
         for step_result in result.steps_results:
             assert step_result.execution_result.screenshot_path == MOCK_SCREENSHOT_PATH
             assert step_result.execution_result.screenshot_path.startswith("screenshots/")

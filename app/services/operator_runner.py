@@ -1,13 +1,13 @@
 # app/services/operator_runner.py
-
 from abc import ABC, abstractmethod
 from typing import List, Dict, Optional, Any
 from dataclasses import dataclass
 from datetime import datetime
-from dotenv import load_dotenv
 import json
 import uuid
-import os # Import the os module
+import os
+import asyncio
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError  # New import
 
 from app.infrastructure.playwright_manager import (
     create_browser_manager,
@@ -18,16 +18,18 @@ from app.infrastructure.playwright_manager import (
 from app.infrastructure.ai_generators import (
     create_nl_to_gherkin_generator,
     create_playwright_generator,
-    GherkinStep  # New dataclass from ai_generators.py
+    GherkinStep
 )
+from app.infrastructure.interfaces import HTMLSummarizerInterface
+from app.infrastructure.snapshot_storage import SnapshotStorage
 from app.utils.logger import get_logger
+from dotenv import load_dotenv
 from app.domain.exceptions import (
     OperatorExecutionException,
     StepExecutionException,
     StepGenerationException,
     ValidationException
 )
-from app.utils.html_summarizer import html_to_json_visible
 
 logger = get_logger(__name__)
 load_dotenv()
@@ -39,7 +41,7 @@ class StepExecutionResult:
     gherkin_step: GherkinStep  # Changed to use GherkinStep
     execution_result: ExecutionResult
     playwright_instruction: str
-    snapshot_before: str
+    snapshot_json: str
     start_time: datetime
     end_time: datetime
     duration: float
@@ -64,21 +66,22 @@ class OperatorRunnerInterface(ABC):
         pass
 
 class OperatorRunnerService(OperatorRunnerInterface):
-    """Service for executing test cases from natural language."""
-
     def __init__(
         self,
         browser_config: Optional[BrowserConfig] = None,
-        ai_client_type: str = "abacus"
+        ai_client_type: str = "abacus",
+        html_summarizer: Optional[HTMLSummarizerInterface] = None,
+        snapshot_storage: Optional[SnapshotStorage] = None
     ):
         self.browser_config = browser_config or BrowserConfig()
         self.nl_to_gherkin = create_nl_to_gherkin_generator(ai_client_type)
         self.playwright_generator = create_playwright_generator(ai_client_type)
+        self.html_summarizer = html_summarizer
+        self.snapshot_storage = snapshot_storage or SnapshotStorage()
         self._browser_manager: Optional[BrowserManagerInterface] = None
         self._browser_initialized = False
 
     async def _initialize_browser(self) -> None:
-        """Initialize browser with error handling."""
         if not self._browser_initialized:
             try:
                 logger.debug("Creating browser manager")
@@ -88,13 +91,12 @@ class OperatorRunnerService(OperatorRunnerInterface):
                 self._browser_initialized = True
                 logger.info("Browser initialized successfully")
             except Exception as e:
-                self._browser_manager = None
+                # Do not set self._browser_manager = None here; let _cleanup_browser handle it
                 self._browser_initialized = False
                 logger.error(f"Browser initialization failed: {str(e)}")
                 raise OperatorExecutionException(f"Failed to initialize browser: {str(e)}")
-
+            
     async def _cleanup_browser(self) -> None:
-        """Safely cleanup browser resources."""
         if self._browser_manager is not None:
             try:
                 logger.debug("Stopping browser")
@@ -107,12 +109,10 @@ class OperatorRunnerService(OperatorRunnerInterface):
                 logger.debug("Browser cleanup completed")
 
     async def _ensure_browser_ready(self) -> None:
-        """Ensure browser is initialized and ready."""
         if not self._browser_initialized or self._browser_manager is None:
             await self._initialize_browser()
 
     async def run_operator_case(self, url: str, natural_language_steps: str) -> OperatorCaseResult:
-        """Execute a complete test case with enhanced error handling."""
         start_time = datetime.now()
         steps_results = []
         success = True
@@ -140,20 +140,19 @@ class OperatorRunnerService(OperatorRunnerInterface):
             for attempt in range(max_retries):
                 try:
                     logger.debug(f"Navigation attempt {attempt + 1}/{max_retries}")
-
-                    # Attempt navigation
+                    # Use 'load' instead of 'networkidle' for more reliable navigation
                     nav_result = await self._browser_manager.execute_step(
-                        f"goto('{url}', wait_until='networkidle')"
+                        f"goto('{url}', {{ wait_until: 'load', timeout: {self.browser_config.timeout} }})"
                     )
 
                     if not nav_result.success:
+                        logger.warning(f"Navigation command failed: {nav_result.error_message}")
                         raise OperatorExecutionException("Navigation command failed")
 
                     # Verify current URL
                     url_result = await self._browser_manager.execute_step("url()")
                     current_url = url_result.result
 
-                    # URL verification with detailed logging
                     if not current_url:
                         logger.warning("Current URL is empty")
                         continue
@@ -166,23 +165,22 @@ class OperatorRunnerService(OperatorRunnerInterface):
                         logger.warning(f"Expected URL not found. Expected: {url}, Got: {current_url}")
                         continue
 
-                    # Additional waiting for page readiness
+                    # Wait for page readiness
                     try:
                         await self._wait_for_page_ready()
                         navigation_success = True
                         logger.info(f"Successfully navigated to {current_url}")
                         break
-                    except Exception as wait_error:
+                    except PlaywrightTimeoutError as wait_error:
                         logger.warning(f"Page readiness check failed: {str(wait_error)}")
                         continue
 
                 except Exception as e:
                     logger.warning(f"Navigation attempt {attempt + 1} failed: {str(e)}")
                     if attempt < max_retries - 1:
-                        await asyncio.sleep(1)  # Wait before retry
+                        await asyncio.sleep(2)  # Increased delay for stability
                     continue
 
-            # Check if navigation was successful
             if not navigation_success:
                 raise OperatorExecutionException(
                     f"Failed to navigate to {url} after {max_retries} attempts"
@@ -193,7 +191,6 @@ class OperatorRunnerService(OperatorRunnerInterface):
             for idx, step in enumerate(gherkin_steps):
                 logger.info(f"Executing step {idx + 1}/{len(gherkin_steps)}: {step.gherkin}")
                 if idx == 0 and step.action == "navigate" and "am on" in step.gherkin.lower():
-                    # Skip first step if it's just asserting the initial state
                     logger.debug("Skipping first navigation step as it's asserting initial state")
                     continue
                 try:
@@ -241,18 +238,18 @@ class OperatorRunnerService(OperatorRunnerInterface):
         )
 
     async def _wait_for_page_ready(self) -> None:
-        """Wait for page to be fully loaded and rendered."""
         try:
-            # Wait for network to be idle
-            await self._browser_manager.execute_step("wait_for_load_state('networkidle')")
-
-            # Wait for no network requests for 500ms
-            await self._browser_manager.execute_step("wait_for_load_state('networkidle', timeout=500)")
-
-            # Wait for DOM to be ready
-            await self._browser_manager.execute_step("wait_for_load_state('domcontentloaded')")
-        except Exception as e:
+            # Wait for page load
+            await self._browser_manager.execute_step(
+                f"wait_for_load_state('load', timeout={self.browser_config.timeout})"
+            )
+            # Wait for DOM content
+            await self._browser_manager.execute_step(
+                f"wait_for_load_state('domcontentloaded', timeout={self.browser_config.timeout})"
+            )
+        except PlaywrightTimeoutError as e:
             logger.warning(f"Page ready wait failed: {str(e)}")
+            raise
 
     async def _execute_single_step(
         self,
@@ -260,25 +257,25 @@ class OperatorRunnerService(OperatorRunnerInterface):
         gherkin_step: GherkinStep
     ) -> StepExecutionResult:
         start_time = datetime.now()
+        snapshot_json = None
+        execution_result = None
+        executed_instruction = None
+
         try:
             # Get current page snapshot
             snapshot_before = await self._browser_manager.get_page_content()
-            snapshot_json = html_to_json_visible(snapshot_before)
+            if not snapshot_before:
+                raise StepExecutionException("Empty page snapshot received")
+            snapshot_json = self.html_summarizer.summarize_html(snapshot_before)
 
-            # Save training data to JSONL file
-            #with open("snapshot_before.jsonl", mode='w', encoding='utf-8') as jsonl_file:
-            #    for entry in snapshot_before:
-            #        jsonl_file.write(entry)
-            # Save training data to JSONL file
-            with open("snapshot_json.jsonl", mode='w', encoding='utf-8') as jsonl_file:
-                for entry in snapshot_json:
-                    jsonl_file.write(entry)
+            # Save snapshot
+            try:
+                self.snapshot_storage.save_snapshot(snapshot_json)
+                logger.debug("Training data saved via SnapshotStorage")
+            except IOError as e:
+                logger.warning(f"Failed to save snapshot: {str(e)}")
 
-            logger.debug("Training data saved to 'snapshot_json.jsonl'")
-
-            #logger.debug(f"snapshot_before > {snapshot_before}")
             logger.debug(f"snapshot_json > {snapshot_json}")
-            exit()
 
             try:
                 # Generate Playwright instruction JSON
@@ -290,66 +287,77 @@ class OperatorRunnerService(OperatorRunnerInterface):
                 # Parse and try instructions
                 try:
                     instruction_data = json.loads(instruction_json)
-
-                    # Try each instruction in order until one succeeds
                     last_error = None
-                    executed_instruction = None
 
-                    # Try high precision instructions first
                     for instruction in instruction_data.get("high_precision", []):
-                        try:
-                            logger.debug(f"Trying high precision instruction > {instruction}")
-                            execution_result = await self._browser_manager.execute_step(instruction)
-                            if execution_result.success:
-                                executed_instruction = instruction
-                                break
-                        except Exception as e:
-                            last_error = e
-                            logger.debug(f"High precision instruction failed: {str(e)}")
-                            continue
+                        logger.debug(f"Trying high precision instruction > {instruction}")
+                        execution_result = await self._browser_manager.execute_step(instruction)
+                        if not execution_result.success:
+                            logger.debug(f"High precision instruction failed: {execution_result.error_message}")
+                            end_time = datetime.now()
+                            duration = (end_time - start_time).total_seconds()
+                            return StepExecutionResult(
+                                natural_language_step=natural_language_step,
+                                gherkin_step=gherkin_step,
+                                execution_result=execution_result,
+                                playwright_instruction=instruction,
+                                snapshot_json=snapshot_json,
+                                start_time=start_time,
+                                end_time=end_time,
+                                duration=duration
+                            )
+                        executed_instruction = instruction
+                        logger.debug(f"Successfully executed instruction > {instruction}")
+                        break
 
-                    # If no high precision instruction succeeded, try low precision
                     if not executed_instruction:
                         for instruction in instruction_data.get("low_precision", []):
-                            try:
-                                logger.debug(f"Trying low precision instruction > {instruction}")
-                                execution_result = await self._browser_manager.execute_step(instruction)
-                                if execution_result.success:
-                                    executed_instruction = instruction
-                                    break
-                            except Exception as e:
-                                last_error = e
-                                logger.debug(f"Low precision instruction failed: {str(e)}")
-                                continue
+                            logger.debug(f"Trying low precision instruction > {instruction}")
+                            execution_result = await self._browser_manager.execute_step(instruction)
+                            if not execution_result.success:
+                                logger.debug(f"Low precision instruction failed: {execution_result.error_message}")
+                                end_time = datetime.now()
+                                duration = (end_time - start_time).total_seconds()
+                                return StepExecutionResult(
+                                    natural_language_step=natural_language_step,
+                                    gherkin_step=gherkin_step,
+                                    execution_result=execution_result,
+                                    playwright_instruction=instruction,
+                                    snapshot_json=snapshot_json,
+                                    start_time=start_time,
+                                    end_time=end_time,
+                                    duration=duration
+                                )
+                            executed_instruction = instruction
+                            logger.debug(f"Successfully executed instruction > {instruction}")
+                            break
 
-                        if not executed_instruction:
-                            raise StepGenerationException(
-                                f"All instructions failed. Last error: {str(last_error)}"
-                            )
-
-                    logger.debug(f"Successfully executed instruction > {executed_instruction}")
+                    if not executed_instruction:
+                        raise StepExecutionException(
+                            f"No valid instructions executed. Last error: {last_error or 'Unknown error'}"
+                        )
 
                 except json.JSONDecodeError as e:
                     raise StepGenerationException(f"Invalid JSON response: {str(e)}")
                 except Exception as e:
-                    raise StepGenerationException(f"Failed to execute instructions: {str(e)}")
+                    raise StepExecutionException(f"Failed to execute instructions: {str(e)}")
 
             except StepGenerationException as e:
-                # Create a failed execution result for generation failure
                 end_time = datetime.now()
                 duration = (end_time - start_time).total_seconds()
+                execution_result = ExecutionResult(
+                    success=False,
+                    screenshot_path=None,
+                    error_message=f"Step generation/execution failed: {str(e)}",
+                    page_url=self._browser_manager._page.url if self._browser_manager._page else None,
+                    execution_time=duration
+                )
                 return StepExecutionResult(
                     natural_language_step=natural_language_step,
                     gherkin_step=gherkin_step,
-                    execution_result=ExecutionResult(
-                        success=False,
-                        error_message=f"Step generation/execution failed: {str(e)}",
-                        screenshot_path=None,
-                        page_url=self._browser_manager._page.url if self._browser_manager._page else None,
-                        execution_time=duration
-                    ),
-                    playwright_instruction=instruction_json,  # Store the raw JSON for debugging
-                    snapshot_before=snapshot_before,
+                    execution_result=execution_result,
+                    playwright_instruction=None,
+                    snapshot_json=snapshot_json,
                     start_time=start_time,
                     end_time=end_time,
                     duration=duration
@@ -362,8 +370,8 @@ class OperatorRunnerService(OperatorRunnerInterface):
                 natural_language_step=natural_language_step,
                 gherkin_step=gherkin_step,
                 execution_result=execution_result,
-                playwright_instruction=executed_instruction,  # Store the successful instruction
-                snapshot_before=snapshot_before,
+                playwright_instruction=executed_instruction,
+                snapshot_json=snapshot_json,
                 start_time=start_time,
                 end_time=end_time,
                 duration=duration
@@ -371,30 +379,36 @@ class OperatorRunnerService(OperatorRunnerInterface):
 
         except Exception as e:
             logger.error(f"Step execution failed: {str(e)}", exc_info=True)
-            raise StepExecutionException(f"Step execution failed: {str(e)}")
-
+            end_time = datetime.now()
+            duration = (end_time - start_time).total_seconds()
+            execution_result = ExecutionResult(
+                success=False,
+                screenshot_path=None,
+                error_message=str(e),
+                page_url=self._browser_manager._page.url if self._browser_manager._page else None,
+                execution_time=duration
+            )
+            return StepExecutionResult(
+                natural_language_step=natural_language_step,
+                gherkin_step=gherkin_step,
+                execution_result=execution_result,
+                playwright_instruction=executed_instruction,
+                snapshot_json=snapshot_json,
+                start_time=start_time,
+                end_time=end_time,
+                duration=duration
+            )
+        
 class OperatorRunnerFactory:
-    """Factory for creating operator runners with different configurations."""
-
     @staticmethod
     def create_runner(
         browser_config: Optional[BrowserConfig] = None,
-        ai_client_type: Optional[str] = None, # Make ai_client_type Optional
+        ai_client_type: Optional[str] = None,
         headless: bool = True,
+        html_summarizer: Optional[HTMLSummarizerInterface] = None,
+        snapshot_storage: Optional[SnapshotStorage] = None,
         **kwargs
     ) -> OperatorRunnerInterface:
-        """
-        Create an operator runner with the specified configuration.
-
-        Args:
-            browser_config: Optional browser configuration
-            ai_client_type: Type of AI client to use ("abacus" by default)
-            headless: Whether to run browser in headless mode
-            **kwargs: Additional configuration options
-
-        Returns:
-            OperatorRunnerInterface: Configured operator runner
-        """
         if browser_config is None:
             browser_config = BrowserConfig(
                 headless=headless,
@@ -404,38 +418,39 @@ class OperatorRunnerFactory:
                 screenshot_dir=kwargs.get('screenshot_dir', 'screenshots'),
                 trace_dir=kwargs.get('trace_dir', 'traces')
             )
-        
-        # Use environment variable, default to "abacus" if not set
-        ai_client_type = ai_client_type or os.getenv("AI_CLIENT_TYPE", "abacus") 
-
+        ai_client_type = ai_client_type or os.getenv("AI_CLIENT_TYPE", "abacus")
+        from app.infrastructure.html_summarizer import HTMLSummarizer
+        html_summarizer = html_summarizer or HTMLSummarizer()
+        snapshot_storage = snapshot_storage or SnapshotStorage()
         return OperatorRunnerService(
             browser_config=browser_config,
-            ai_client_type=ai_client_type
+            ai_client_type=ai_client_type,
+            html_summarizer=html_summarizer,
+            snapshot_storage=snapshot_storage
         )
 
     @staticmethod
     def create_debug_runner(
-        ai_client_type: Optional[str] = None, # Make ai_client_type Optional
+        ai_client_type: Optional[str] = None,
         **kwargs
-        ) -> OperatorRunnerInterface:
-        """
-        Create a runner configured for debugging (non-headless, longer timeouts).
-        """
+    ) -> OperatorRunnerInterface:
         browser_config = BrowserConfig(
             headless=False,
             viewport_width=kwargs.get('viewport_width', 1280),
             viewport_height=kwargs.get('viewport_height', 530),
-            timeout=10000,  # Longer timeout for debugging
+            timeout=kwargs.get('timeout', 30000),  # Increased timeout
             screenshot_dir='debug_screenshots',
             trace_dir='debug_traces',
             **kwargs
         )
-        # Use environment variable, default to "abacus" if not set
-        ai_client_type = ai_client_type or os.getenv("AI_CLIENT_TYPE", "abacus") 
-
+        ai_client_type = ai_client_type or os.getenv("AI_CLIENT_TYPE", "abacus")
+        from app.infrastructure.html_summarizer import HTMLSummarizer
+        snapshot_storage = SnapshotStorage()
         return OperatorRunnerService(
             browser_config=browser_config,
-            ai_client_type=ai_client_type
+            ai_client_type=ai_client_type,
+            html_summarizer=HTMLSummarizer(),
+            snapshot_storage=snapshot_storage
         )
 
     @staticmethod

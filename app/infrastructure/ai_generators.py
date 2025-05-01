@@ -113,35 +113,29 @@ class NLToGherkinGenerator(GeneratorInterface):
     
     async def validate_response(self, response: str) -> bool:
         """Validate that the response is a properly formatted JSON array."""
-        print(f"\nValidating response: {response}")
-        print(f"Response type: {type(response)}")
-
         try:
             data = json.loads(response)
-            print(f"Parsed JSON: {data}")
-            print(f"JSON type: {type(data)}")
 
             if not isinstance(data, list):
-                print(f"Expected list, got {type(data)}")
+                logger.debug(f"Expected list, got {type(data)}")
                 return False
 
             for step in data:
-                print(f"Validating step: {step}")
+                logger.info(f"Validating step: {step}")
                 required_fields = {"gherkin", "action", "target"}
                 current_fields = set(step.keys())
-                print(f"Current fields: {current_fields}")
-                print(f"Required fields: {required_fields}")
+                logger.debug(f"Current fields: {current_fields}")
+                logger.debug(f"Required fields: {required_fields}")
 
                 if not required_fields.issubset(current_fields):
-                    print(f"Missing fields: {required_fields - current_fields}")
                     return False
 
             return True
         except json.JSONDecodeError as e:
-            print(f"JSON decode error: {str(e)}")
+            logger.error(f"JSON decode error: {str(e)}")
             return False
         except Exception as e:
-            print(f"Validation error: {str(e)}")
+            logger.error(f"Validation error: {str(e)}")
             return False
 
 class PlaywrightGenerator(GeneratorInterface):
