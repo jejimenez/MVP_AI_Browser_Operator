@@ -11,7 +11,7 @@ class TestAPIEndpoints:
 
     def test_execute_test_case(self, client):
         response = client.post(
-            "/api/tests/execute",
+            "/api/operator/execute",
             json={
                 "url": "https://dev-psa.dev.ninjarmm.com/auth/",
                 "test_steps": """
@@ -19,7 +19,8 @@ class TestAPIEndpoints:
                     When I enter "username@gmail.com" into Email field
                     And I enter "pass" into password field
                     Then I click Sign in button
-                """
+                """,
+                "headless": """False"""
             },
             headers={"X-API-Key": "test_key", "X-Tenant-ID": "test_tenant"}
         )

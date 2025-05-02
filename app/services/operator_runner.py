@@ -7,6 +7,7 @@ import json
 import uuid
 import os
 import asyncio
+from app.infrastructure.html_summarizer import HTMLSummarizer
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError  # New import
 
 from app.infrastructure.playwright_manager import (
@@ -61,8 +62,13 @@ class OperatorRunnerInterface(ABC):
     """Abstract interface for test runners."""
 
     @abstractmethod
-    async def run_operator_case(self, url: str, natural_language_steps: str) -> OperatorCaseResult:
-        """Execute a complete test case from natural language description."""
+    async def run_operator_case(
+        self,
+        url: str,
+        natural_language_steps: List[str],
+        headless: Optional[bool] = None  # Optional headless parameter
+    ) -> OperatorCaseResult:
+        """Run a test case with natural language steps."""
         pass
 
 class OperatorRunnerService(OperatorRunnerInterface):
@@ -76,22 +82,33 @@ class OperatorRunnerService(OperatorRunnerInterface):
         self.browser_config = browser_config or BrowserConfig()
         self.nl_to_gherkin = create_nl_to_gherkin_generator(ai_client_type)
         self.playwright_generator = create_playwright_generator(ai_client_type)
-        self.html_summarizer = html_summarizer
+        self.html_summarizer = html_summarizer or HTMLSummarizer()
         self.snapshot_storage = snapshot_storage or SnapshotStorage()
         self._browser_manager: Optional[BrowserManagerInterface] = None
         self._browser_initialized = False
 
-    async def _initialize_browser(self) -> None:
+    async def _initialize_browser(self, headless: Optional[bool] = None) -> None:
         if not self._browser_initialized:
             try:
+                # Override browser_config.headless if headless is provided
+                effective_config = self.browser_config
+                if headless is not None:
+                    effective_config = BrowserConfig(
+                        headless=headless,
+                        viewport_width=self.browser_config.viewport_width,
+                        viewport_height=self.browser_config.viewport_height,
+                        timeout=self.browser_config.timeout,
+                        screenshot_dir=self.browser_config.screenshot_dir,
+                        trace_dir=self.browser_config.trace_dir
+                    )
+                
                 logger.debug("Creating browser manager")
-                self._browser_manager = create_browser_manager(config=self.browser_config)
+                self._browser_manager = create_browser_manager(config=effective_config)
                 logger.debug("Starting browser")
                 await self._browser_manager.start()
                 self._browser_initialized = True
-                logger.info("Browser initialized successfully")
+                logger.info(f"Browser initialized in {'headless' if effective_config.headless else 'headed'} mode")
             except Exception as e:
-                # Do not set self._browser_manager = None here; let _cleanup_browser handle it
                 self._browser_initialized = False
                 logger.error(f"Browser initialization failed: {str(e)}")
                 raise OperatorExecutionException(f"Failed to initialize browser: {str(e)}")
@@ -108,11 +125,11 @@ class OperatorRunnerService(OperatorRunnerInterface):
                 self._browser_initialized = False
                 logger.debug("Browser cleanup completed")
 
-    async def _ensure_browser_ready(self) -> None:
+    async def _ensure_browser_ready(self, headless: Optional[bool] = None) -> None:
         if not self._browser_initialized or self._browser_manager is None:
-            await self._initialize_browser()
+            await self._initialize_browser(headless=headless)
 
-    async def run_operator_case(self, url: str, natural_language_steps: str) -> OperatorCaseResult:
+    async def run_operator_case(self, url: str, natural_language_steps: str, headless: Optional[bool] = None) -> OperatorCaseResult:
         start_time = datetime.now()
         steps_results = []
         success = True
@@ -130,7 +147,7 @@ class OperatorRunnerService(OperatorRunnerInterface):
                 raise StepGenerationException(f"Step generation failed: {str(e)}")
 
             # 2. Initialize browser and navigate
-            await self._ensure_browser_ready()
+            await self._ensure_browser_ready(headless=headless)
 
             # 3. Navigate to initial URL with enhanced retry logic
             logger.info(f"Navigating to URL: {url}")
@@ -500,13 +517,11 @@ class OperatorRunnerFactory:
 
 def create_operator_runner(
     browser_config: Optional[BrowserConfig] = None,
-    ai_client_type: Optional[str] = None # Make ai_client_type Optional here too
+    ai_client_type: Optional[str] = None
 ) -> OperatorRunnerInterface:
-    """
-    Creates an OperatorRunnerService instance.
-    """
-    # Use environment variable, default to "abacus" if not set
     ai_client_type = ai_client_type or os.getenv("AI_CLIENT_TYPE", "abacus")
+    if browser_config is None:
+        browser_config = BrowserConfig(headless=False)  # Default to headed mode
     return OperatorRunnerService(
         browser_config=browser_config,
         ai_client_type=ai_client_type
