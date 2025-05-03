@@ -1,5 +1,6 @@
 # app/utils/config.py
 
+import os
 from functools import lru_cache
 from typing import List, Optional
 from pydantic import BaseModel, HttpUrl, Field, ConfigDict
@@ -26,6 +27,11 @@ class AbacusConfig(BaseModel):
         from_attributes=True    # Allows creation from ORM objects
     )
 
+def get_ia_api_key() -> List[str]:
+    # Try GROK_API_KEY first, then GEMINI_API_KEY
+    api_key = os.getenv("GROK_API_KEY") or os.getenv("GEMINI_API_KEY") or ""
+    return [api_key]
+
 class Settings(BaseSettings):
     """Main application settings."""
     # Basic app settings
@@ -34,7 +40,7 @@ class Settings(BaseSettings):
     items_per_user: int = 50
     base_url: HttpUrl = "http://localhost:8000"
     runner_type: str = "default"
-    valid_api_keys: List[str] = []
+    valid_api_keys: List[str] = Field(default_factory=get_ia_api_key)
 
     # Browser configuration
     browser_config: BrowserConfig = BrowserConfig()
