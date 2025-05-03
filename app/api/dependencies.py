@@ -16,25 +16,6 @@ async def get_current_tenant(
         )
     return x_tenant_id
 
-async def validate_api_key(
-    x_api_key: Optional[str] = Header(None)
-) -> str:
-    """Validate API key from request header."""
-    if not x_api_key:
-        raise HTTPException(
-            status_code=400,
-            detail="X-API-Key header is required"
-        )
-
-    settings = get_settings()
-    if x_api_key not in settings.valid_api_keys:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid API key"
-        )
-
-    return x_api_key
-
 async def get_health_checker() -> HealthChecker:
     """
     Dependency for getting health checker instance.

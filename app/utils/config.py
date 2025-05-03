@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     items_per_user: int = 50
     base_url: HttpUrl = "http://localhost:8000"
     runner_type: str = "default"
-    valid_api_keys: List[str] = Field(default_factory=get_ia_api_key)
+    #valid_api_keys: List[str] = Field(default_factory=get_ia_api_key)
 
     # Browser configuration
     browser_config: BrowserConfig = BrowserConfig()

@@ -19,7 +19,6 @@ from app.services.operator_runner import (
 )
 from app.api.dependencies import (
     get_current_tenant,
-    validate_api_key
 )
 from app.utils.logger import get_logger
 
@@ -43,7 +42,6 @@ async def execute_operator_case(
     background_tasks: BackgroundTasks,
     test_runner: OperatorRunnerInterface = Depends(get_operator_runner),
     tenant_id: str = Depends(get_current_tenant),
-    api_key: str = Depends(validate_api_key)
 ) -> TestCaseResponse:
     """
     Execute a single test case with the provided steps.
@@ -53,7 +51,6 @@ async def execute_operator_case(
         background_tasks: FastAPI background tasks handler
         test_runner: Injected test runner service
         tenant_id: Current tenant identifier
-        api_key: Validated API key
     """
     try:
         # Execute test case with headless parameter (None if not provided)
