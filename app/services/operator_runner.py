@@ -138,6 +138,7 @@ class OperatorRunnerService(OperatorRunnerInterface):
 
         try:
             # 1. Generate structured Gherkin steps
+            logger.info("--------------------------------------Started running Operator------------------------------")
             logger.info("Generating structured Gherkin steps from natural language")
             try:
                 gherkin_steps = await self.nl_to_gherkin.generate_steps(natural_language_steps)
@@ -211,6 +212,7 @@ class OperatorRunnerService(OperatorRunnerInterface):
             # 4. Execute steps
             nl_steps_list = [s.strip() for s in natural_language_steps.split('\n') if s.strip()]
             for idx, step in enumerate(gherkin_steps):
+                logger.info(f"--------------------------------------Gherkin Step #{idx}---------------------------------")
                 logger.info(f"Executing step {idx + 1}/{len(gherkin_steps)}: {step.gherkin}")
                 if idx == 0 and step.action == "navigate" and "am on" in step.gherkin.lower():
                     logger.debug("Skipping first navigation step as it's asserting initial state")

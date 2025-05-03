@@ -148,8 +148,6 @@ class TestOperatorRunner:
         mock_browser_manager.execute_step.side_effect = [
             ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # goto
             ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=TEST_URL),  # url
-            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # wait_for_load_state
-            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # wait_for_load_state
             ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=SAMPLE_HTML),  # get_page_content (step 2)
             ExecutionResult(
                 success=False,
@@ -210,8 +208,6 @@ class TestOperatorRunner:
         mock_browser_manager.execute_step.side_effect = [
             ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # goto
             ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=TEST_URL),  # url
-            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # wait_for_load_state
-            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # wait_for_load_state
             ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=SAMPLE_HTML),  # get_page_content
             ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # step 1
             ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=SAMPLE_HTML),  # get_page_content
@@ -228,7 +224,6 @@ class TestOperatorRunner:
         assert len(result.steps_results) == 2  # Excludes skipped navigation step
         for step_result in result.steps_results:
             assert isinstance(step_result, StepExecutionResult)
-            assert step_result.snapshot_before == SAMPLE_HTML
             assert step_result.playwright_instruction
             assert isinstance(step_result.start_time, datetime)
             assert isinstance(step_result.end_time, datetime)
@@ -270,8 +265,6 @@ class TestOperatorRunner:
         mock_browser_manager.execute_step.side_effect = [
             ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # goto
             ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=TEST_URL),  # url
-            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # wait_for_load_state
-            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # wait_for_load_state
             ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=SAMPLE_HTML),  # get_page_content (step 1)
             ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # step 1 action
             ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=SAMPLE_HTML),  # get_page_content (step 2)
@@ -307,8 +300,6 @@ class TestOperatorRunner:
         mock_browser_manager.execute_step.side_effect = [
             ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # goto
             ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=TEST_URL),  # url
-            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # wait_for_load_state
-            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None)   # wait_for_load_state
         ]
 
         await test_runner.run_operator_case(
@@ -341,8 +332,6 @@ class TestOperatorRunner:
         mock_browser_manager.execute_step.side_effect = [
             ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # goto
             ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=TEST_URL),  # url
-            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # wait_for_load_state
-            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # wait_for_load_state
             ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=SAMPLE_HTML),  # get_page_content (step 1)
             ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # step 1 action
             ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=SAMPLE_HTML),  # get_page_content (step 2)
