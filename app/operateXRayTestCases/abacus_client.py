@@ -20,7 +20,6 @@ class AbacusAIClient:
 
         # Headers matching the working curl command
         self.headers = {
-            'apiKey': self.api_key,
             'Content-Type': 'application/json'
         }
 
