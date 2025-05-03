@@ -2,6 +2,9 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
 
 from app.api.routes import api_router
 from app.utils.logger import get_logger
@@ -25,13 +28,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount static files
+app.mount("/static", StaticFiles(directory="app"), name="static")
+
 # Include all API routes
 app.include_router(api_router, prefix="/api")
 
-# Optional: root endpoint
+# Root endpoint to serve the HTML file
 @app.get("/", tags=["Root"])
 async def root():
-    return {"message": f"Welcome to {settings.app_name}!"}
+    return FileResponse("app/index.html")
 
 # Optional: custom exception handlers, startup/shutdown events, etc.
 # Example:
