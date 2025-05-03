@@ -192,6 +192,20 @@ For detailed debugging, run specific test suites:
 -   PYTHONPATH=. pytest tests/integration/test_operator_runner.py -vv -k
     > \"test_successful_operator_execution\" \--log-cli-level=DEBUG
 
+**Call the API**
+
+To call the API remember to have the FastAPI application started using Uvicorn. This command will run the operator with the browser controls. Change the headless flag to true if you want to running in background
+
+curl -X POST http://localhost:8000/api/operator/execute \
+-H "Content-Type: application/json" \
+-H "X-API-Key: test_key" \
+-H "X-Tenant-ID: test_tenant" \
+-d '{
+    "url": "https://dev-psa.dev.ninjarmm.com/auth/",
+    "test_steps": "Given I am on the login page\nWhen I enter \"username@gmail.com\" into Email field\nAnd I enter \"pass\" into password field\nThen I click Sign in button",
+    "headless": false
+}'
+
 **Directory Structure**
 
 WebOperatorFromTC/
