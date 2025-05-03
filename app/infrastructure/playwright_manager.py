@@ -118,7 +118,7 @@ class PlaywrightManager(BrowserManagerInterface):
         # New locator() expect patterns
         re.compile(r"expect\(locator\(['\"]([^'\"]+)['\"]\)\)\.to_be_visible\(\)"),
         re.compile(r"expect\(locator\(['\"]([^'\"]+)['\"]\)\)\.to_have_text\(['\"]([^'\"]+)['\"]\)"),
-
+        re.compile(r"expect\(locator\(\\'\[role=\"[^\"]+\"\]\\'\)\)\.to_be_visible\(\)"),  # Allows any role value
         re.compile(r"url\(\)")
     }
 

@@ -1,5 +1,6 @@
 # Environment variables
 .env
+.env2
 
 # Python
 __pycache__/
@@ -26,6 +27,7 @@ var/
 
 # Virtual Environment
 venv/
+venv312/
 ENV/
 
 # IDE

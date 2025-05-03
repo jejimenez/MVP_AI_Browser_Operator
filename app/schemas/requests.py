@@ -8,6 +8,7 @@ class TestCaseRequest(BaseModel):
     """Request model for test case execution."""
     url: HttpUrl
     test_steps: str
+    headless: Optional[bool] = None 
     timeout: Optional[int] = Field(default=30, ge=1, le=300)
     capture_screenshots: bool = True
     retry_attempts: Optional[int] = Field(default=1, ge=1, le=3)
@@ -17,6 +18,7 @@ class TestCaseFileRequest(BaseModel):
     url: HttpUrl
     file: bytes
     file_type: str = "text/plain"
+    headless: Optional[bool] = None
 
 class TestSuiteRequest(BaseModel):
     """Request model for test suite execution."""
