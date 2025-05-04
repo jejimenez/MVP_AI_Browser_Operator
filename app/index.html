@@ -3,57 +3,227 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Browser Operator</title>
+    <title>AI Browser Operator - Web Test Automation</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
-        .log-container {
-            height: 300px;
+        .test-results {
+            height: 600px;
             overflow-y: auto;
             background-color: #1a1a1a;
-            color: #00ff00;
+            color: #ffffff;
             font-family: monospace;
             padding: 1rem;
         }
-        .log-entry {
+        .test-results .log-entry {
+            margin-bottom: 1rem;
+            padding: 1rem;
+            border-radius: 4px;
+            background-color: #2a2a2a;
+        }
+        .test-case-header {
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #444;
+        }
+        .test-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            color: #cccccc;
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+        .steps-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        .step-container {
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 1rem;
+            background-color: #333;
+        }
+        .step-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            color: #00ff00;
+            font-weight: bold;
+        }
+        .step-number {
+            background-color: #444;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+        }
+        .step-details {
+            margin-left: 1rem;
+            color: #cccccc;
+        }
+        .success {
+            color: #00ff00;
+        }
+        .error {
+            color: #ff4444;
+        }
+        .error-message {
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            background-color: rgba(255, 68, 68, 0.1);
+            border-radius: 4px;
+        }
+        .test-summary {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background-color: #333;
+        }
+        .summary-header {
+            font-weight: bold;
+            color: #00ff00;
+            margin-bottom: 1rem;
+        }
+        .summary-details {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .step-execution, .step-duration, .total-duration {
+            margin: 0.5rem 0;
+        }
+        .instructions {
+            background-color: #f8f9fa;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .instructions h3 {
+            color: #2d3748;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        .instructions p {
+            color: #4a5568;
+            margin-bottom: 1rem;
+        }
+        .instructions ul, .instructions ol {
+            margin-left: 1rem;
+            color: #4a5568;
+        }
+        .instructions li {
             margin-bottom: 0.5rem;
+        }
+        .example-box {
+            background-color: #edf2f7;
+            border-left: 4px solid #4299e1;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 0.25rem;
+        }
+        .example-box pre {
+            background-color: #2d3748;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 0.25rem;
+            overflow-x: auto;
         }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
     <div class="container mx-auto px-4 py-8">
-        <h1 class="text-3xl font-bold text-center mb-8">AI Browser Operator</h1>
-        
-        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
-            <form id="apiForm" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">AI Client</label>
-                    <select id="aiClientSelect" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                        <option value="abacus">Abacus AI</option>
-                        <option value="gemini">Gemini AI</option>
-                        <option value="grok">Grok AI</option>
-                    </select>
-                </div>
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800">AI Browser Operator</h1>
+            <p class="text-xl text-gray-600 mt-2">Automate your web testing with AI</p>
+        </header>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">URL</label>
-                    <input type="text" id="url" value="https://dev-psa.dev.ninjarmm.com/auth/" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                </div>
+        <div class="instructions">
+            <h3 class="text-2xl">Welcome to AI Browser Operator</h3>
+            <p>This powerful tool helps you automate web application testing using artificial intelligence. Write your test scenarios in natural language, and let the AI handle the automation for you.</p>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Instructions</label>
-                    <textarea id="instructions" rows="4" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"></textarea>
-                </div>
+            <h4 class="text-xl font-semibold mt-4">Key Features</h4>
+            <ul class="list-disc">
+                <li>Natural language test instructions</li>
+                <li>Multiple AI models for optimal performance</li>
+                <li>Detailed test execution reports</li>
+                <li>Real-time test progress tracking</li>
+            </ul>
 
-                <button type="submit" class="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-                    Execute
-                </button>
-            </form>
+            <h4 class="text-xl font-semibold mt-4">How to Use</h4>
+            <ol class="list-decimal">
+                <li>Select your preferred AI model (Grok is recommended for most cases)</li>
+                <li>Enter the URL of the web application you want to test</li>
+                <li>Write your test instructions in natural language</li>
+                <li>Click "Execute" to run the test</li>
+                <li>Review the test results</li>
+            </ol>
+
+            <h4 class="text-xl font-semibold mt-4">Example Test Instructions</h4>
+            <div class="example-box">
+                <p>Here are some examples of test instructions you can use:</p>
+                <pre class="mt-2">
+1. Login Test:
+   "Insert username 'admin@gmail.com' and password 'password123'"
+
+2. Navigation Test:
+   "Navigate to the dashboard and verify the welcome message"
+
+3. Form Submission:
+   "Fill out the contact form with name 'John Doe', email 'john@example.com', and message 'Test message'"
+
+4. UI Interaction:
+   "Click the settings button and change the theme to dark mode"
+
+5. Data Verification:
+   "Verify that the total amount shown is $100.00"</pre>
+            </div>
+
+            <h4 class="text-xl font-semibold mt-4">Best Practices</h4>
+            <ul class="list-disc">
+                <li>Be specific in your instructions</li>
+                <li>Use clear, concise language</li>
+                <li>Include verification steps</li>
+                <li>Test one scenario at a time</li>
+            </ul>
         </div>
 
-        <div class="bg-white rounded-lg shadow-md p-6">
-            <h2 class="text-xl font-semibold mb-4">Logs</h2>
-            <div id="logContainer" class="log-container rounded-md">
-                <div class="log-entry">Ready to execute commands...</div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4">Test Configuration</h2>
+                <form id="apiForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">AI Client</label>
+                        <select id="aiClientSelect" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <option value="grok">Grok AI</option>
+                            <option value="abacus">Abacus AI</option>
+                            <option value="gemini">Gemini AI</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">URL</label>
+                        <input type="text" id="url" value="https://dev-psa.dev.ninjarmm.com/auth/" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Test Instructions</label>
+                        <textarea id="instructions" rows="6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="Enter your test instructions in natural language..."></textarea>
+                    </div>
+
+                    <button type="submit" class="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                        Execute Test
+                    </button>
+                </form>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold mb-4">Test Results</h2>
+                <div id="logContainer" class="test-results rounded-md">
+                    <div class="log-entry">
+                        <p class="text-gray-400">Test results will appear here...</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -68,10 +238,113 @@
             
             const logContainer = document.getElementById('logContainer');
             
+            function formatTestResult(data) {
+                let html = '';
+                
+                // Test Case Header
+                html += `
+                    <div class="test-case-header">
+                        <h3 class="text-lg font-semibold text-white">Test Case Execution</h3>
+                        <div class="test-info">
+                            <span>URL: ${url}</span>
+                            <span>AI Model: ${aiClient}</span>
+                            <span>Execution Time: ${new Date(data.execution_time).toLocaleString()}</span>
+                        </div>
+                    </div>
+                `;
+
+                if (data.steps_results && data.steps_results.length > 0) {
+                    // Steps Execution
+                    html += '<div class="steps-container">';
+                    data.steps_results.forEach((step, index) => {
+                        const errorMessage = step.error ? 
+                            step.error.includes('Invalid Playwright instruction format') ? 
+                                'This step of the test failed.' :
+                                step.error :
+                            '';
+                        
+                        html += `
+                            <div class="step-container">
+                                <div class="step-header">
+                                    <span class="step-number">Step ${index + 1}</span>
+                                    <span class="step-description">${step.step}</span>
+                                </div>
+                                <div class="step-details">
+                                    <div class="step-execution">
+                                        <strong>Executed:</strong> ${step.step}
+                                    </div>
+                                    <div class="step-status ${step.success ? 'success' : 'error'}">
+                                        <strong>Status:</strong> ${step.success ? '✅ Success' : '❌ Failed'}
+                                        ${errorMessage ? `<div class="error-message">${errorMessage}</div>` : ''}
+                                    </div>
+                                    <div class="step-duration">
+                                        <strong>Duration:</strong> ${step.duration.toFixed(2)}s
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                } else if (data.error_message) {
+                    // Handle case when there are no steps but there's an error
+                    const errorMessage = data.error_message.includes('Invalid Playwright instruction format') ?
+                        'This step of the test failed.' :
+                        data.error_message;
+                    
+                    html += `
+                        <div class="step-container">
+                            <div class="step-header">
+                                <span class="step-number">Error</span>
+                                <span class="step-description">Test Execution Failed</span>
+                            </div>
+                            <div class="step-details">
+                                <div class="step-status error">
+                                    <strong>Status:</strong> ❌ Failed
+                                    <div class="error-message">${errorMessage}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Test Summary
+                html += `
+                    <div class="test-summary">
+                        <div class="summary-header">Test Summary</div>
+                        <div class="summary-details">
+                            <div class="total-duration">
+                                <strong>Total Duration:</strong> ${data.total_duration.toFixed(2)}s
+                            </div>
+                            <div class="overall-status ${data.success ? 'success' : 'error'}">
+                                <strong>Overall Status:</strong> ${data.success ? '✅ Passed' : '❌ Failed'}
+                            </div>
+                            ${data.error_message ? `
+                                <div class="error-message">
+                                    <strong>Error:</strong> ${data.error_message}
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+
+                return html;
+            }
+
             function addLog(message) {
                 const logEntry = document.createElement('div');
                 logEntry.className = 'log-entry';
-                logEntry.textContent = message;
+                
+                if (typeof message === 'string' && message.startsWith('Response received:')) {
+                    try {
+                        const data = JSON.parse(message.replace('Response received:', '').trim());
+                        logEntry.innerHTML = formatTestResult(data);
+                    } catch (e) {
+                        logEntry.textContent = message;
+                    }
+                } else {
+                    logEntry.textContent = message;
+                }
+                
                 logContainer.appendChild(logEntry);
                 logContainer.scrollTop = logContainer.scrollHeight;
             }
@@ -97,8 +370,7 @@
                 }
 
                 const data = await response.json();
-                addLog('Response received:');
-                addLog(JSON.stringify(data, null, 2));
+                addLog('Response received: ' + JSON.stringify(data));
                 
             } catch (error) {
                 addLog(`Error: ${error.message}`);
