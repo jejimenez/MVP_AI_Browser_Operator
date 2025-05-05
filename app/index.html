@@ -163,20 +163,12 @@
             <div class="example-box">
                 <p>Here are some examples of test instructions you can use:</p>
                 <pre class="mt-2">
-1. Login Test:
-   "Insert username 'admin@gmail.com' and password 'password123'"
+                    
+1. Insert username 'admin2@gmail.com'
+2. Insert password 'password123'
+3. Click in "Log out"
 
-2. Navigation Test:
-   "Navigate to the dashboard and verify the welcome message"
-
-3. Form Submission:
-   "Fill out the contact form with name 'John Doe', email 'john@example.com', and message 'Test message'"
-
-4. UI Interaction:
-   "Click the settings button and change the theme to dark mode"
-
-5. Data Verification:
-   "Verify that the total amount shown is $100.00"</pre>
+</pre>
             </div>
 
             <h4 class="text-xl font-semibold mt-4">Best Practices</h4>
@@ -372,7 +364,11 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    if (response.status === 422) {
+                        addLog('Error: The URL must start with "http://" or "https://"');
+                    } else {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
                 }
 
                 const data = await response.json();
