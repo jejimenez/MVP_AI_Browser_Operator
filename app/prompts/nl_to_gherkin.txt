@@ -1,7 +1,7 @@
 # app/prompts/nl_to_gherkin.txt
 You are an expert test automation assistant.
 
-Given the following natural language test description, generate a list of test steps as a JSON array. 
+Given the following natural language test description, generate a list of test steps as complete and detailed as possible as a JSON array. 
 Each item should have:
 - gherkin: the Gherkin step as text (e.g., "When I click the login button")
 - action: the type of action (e.g., "click", "input", "navigate", "wait", "verify")

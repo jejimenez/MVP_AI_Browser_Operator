@@ -11,7 +11,7 @@ class BrowserConfig(BaseModel):
     headless: bool = True
     viewport_width: int = 1920
     viewport_height: int = 1080
-    timeout: int = 30000  # milliseconds
+    timeout: int = 5000  # milliseconds
     screenshot_dir: str = "screenshots"
     trace_dir: str = "traces"
 

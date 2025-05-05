@@ -8,7 +8,7 @@ import json
 from app.services.operator_runner import (
     OperatorRunnerService,
     StepExecutionResult,
-    OperatorCaseResult
+    BrowserConfig
 )
 from app.infrastructure.ai_generators import GherkinStep
 from app.infrastructure.playwright_manager import ExecutionResult
@@ -348,3 +348,85 @@ class TestOperatorRunner:
             assert step_result.execution_result.screenshot_path == MOCK_SCREENSHOT_PATH
             assert step_result.execution_result.screenshot_path.startswith("screenshots/")
             assert step_result.execution_result.screenshot_path.endswith(".png")
+    
+    @pytest.mark.asyncio
+    async def test_google_search_button_click(self):
+        """
+        Test clicking the Google search button with correct selector handling.
+        Covers the scenario where the search button is an <input> with role='button'.
+        """
+        # Setup mocks
+        config = BrowserConfig(headless=False, screenshot_dir="test_screenshots")
+        runner = OperatorRunnerService(browser_config=config)
+        
+        # Mock browser manager
+        mock_browser_manager = Mock()
+        mock_browser_manager.start = AsyncMock()
+        mock_browser_manager.stop = AsyncMock()
+        mock_browser_manager.get_page_content = AsyncMock(return_value="<html><input name='btnK' role='button' type='submit' aria-label='Google Zoeken'/></html>")
+        mock_browser_manager.execute_step = AsyncMock(side_effect=[
+            ExecutionResult(success=True, screenshot_path="screenshots/nav.png", result=None),  # goto
+            ExecutionResult(success=True, screenshot_path="screenshots/url.png", result="https://www.google.com"),  # url
+            ExecutionResult(success=True, screenshot_path="screenshots/content.png", result="<html>...</html>"),  # get_page_content
+            ExecutionResult(success=True, screenshot_path="screenshots/click.png", result=None),  # click
+        ])
+        
+        # Mock HTML summarizer
+        mock_html_summarizer = Mock()
+        mock_html_summarizer.summarize_html = Mock(return_value={
+            "role": "WebArea",
+            "children": [
+                {"role": "button", "name": "Google Zoeken", "attributes": {"name": "btnK", "type": "submit"}}
+            ]
+        })
+        
+        # Mock snapshot storage
+        mock_snapshot_storage = Mock()
+        mock_snapshot_storage.save_snapshot = Mock()
+        
+        # Mock nl_to_gherkin generator
+        mock_step_generator = Mock()
+        mock_step_generator.generate_steps = AsyncMock(return_value=[
+            GherkinStep(
+                gherkin="And I click the search button",
+                action="click",
+                target="search button",
+                value=None
+            )
+        ])
+        
+        # Mock playwright generator
+        mock_playwright_generator = Mock()
+        mock_playwright_generator.generate_instruction = AsyncMock(return_value=json.dumps({
+            "high_precision": ["getByRole('button', { name: 'Google Zoeken' }).click()"],
+            "low_precision": ["locator('input[name=\"btnK\"]').click()"]
+        }))
+        
+        # Patch dependencies
+        runner._browser_manager = mock_browser_manager
+        runner.nl_to_gherkin = mock_step_generator
+        runner.playwright_generator = mock_playwright_generator
+        runner.html_summarizer = mock_html_summarizer
+        runner.snapshot_storage = mock_snapshot_storage
+        
+        try:
+            # Run the test case
+            result = await runner.run_operator_case(
+                url="https://www.google.com",
+                natural_language_steps="Click the search button"
+            )
+            
+            # Assertions
+            assert result.success
+            assert len(result.steps_results) == 1
+            step_result = result.steps_results[0]
+            assert step_result.gherkin_step.gherkin == "And I click the search button"
+            assert step_result.execution_result.success
+            assert step_result.playwright_instruction == "getByRole('button', { name: 'Google Zoeken' }).click()"
+            assert step_result.execution_result.screenshot_path == "screenshots/click.png"
+            mock_browser_manager.execute_step.assert_any_call("getByRole('button', { name: 'Google Zoeken' }).click()")
+            mock_html_summarizer.summarize_html.assert_called_once()
+            mock_snapshot_storage.save_snapshot.assert_called_once()
+            
+        finally:
+            await runner._cleanup_browser()

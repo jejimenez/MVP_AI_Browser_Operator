@@ -167,7 +167,7 @@ class TestOperatorRunnerIntegration:
     async def test_google_search_flow(self, runner):
         # Natural language steps describing the test scenario
         nl_steps = (
-            "Navigate to google\n"
+            #"Navigate to google\n"
             "Search for python\n"
             "Click on the first result"
         )

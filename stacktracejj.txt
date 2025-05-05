@@ -1,24 +1,24 @@
 ============================= test session starts ==============================
-platform darwin -- Python 3.12.0, pytest-8.2.0, pluggy-1.5.0 -- /Users/jaimeenrrique/.pyenv/versions/3.12.0/envs/WebTesterAgent/bin/python
-cachedir: .pytest_cache
+platform darwin -- Python 3.12.0, pytest-8.2.0, pluggy-1.5.0
 rootdir: /Users/jaimeenrrique/Automation/WebOperatorFromTC
 configfile: pytest.ini
 plugins: cov-5.0.0, anyio-4.9.0, asyncio-0.23.6, mock-3.14.0
 asyncio: mode=Mode.AUTO
-collecting ... collected 9 items / 8 deselected / 1 selected
+collected 9 items / 8 deselected / 1 selected
 
 tests/integration/test_operator_runner.py::TestOperatorRunnerIntegration::test_google_search_flow 
 -------------------------------- live log setup --------------------------------
 DEBUG    asyncio:selector_events.py:64 Using selector: KqueueSelector
 DEBUG    asyncio:selector_events.py:64 Using selector: KqueueSelector
-INFO     app.infrastructure.ai_client:ai_client.py:158 Successfully initialized Gemini API client with model: gemini-2.0-flash
-INFO     app.infrastructure.ai_client:ai_client.py:158 Successfully initialized Gemini API client with model: gemini-2.0-flash
+INFO     app.infrastructure.ai_client:ai_client.py:334 Successfully initialized Grok API client with model: grok-3-mini-beta
+INFO     app.infrastructure.ai_client:ai_client.py:334 Successfully initialized Grok API client with model: grok-3-mini-beta
 -------------------------------- live log call ---------------------------------
-INFO     app.services.operator_runner:operator_runner.py:124 Generating structured Gherkin steps from natural language
+INFO     app.services.operator_runner:operator_runner.py:156 --------------------------------------Started running Operator------------------------------
+INFO     app.services.operator_runner:operator_runner.py:157 Generating structured Gherkin steps from natural language
 DEBUG    app.infrastructure.ai_generators:ai_generators.py:62 NLToGherkinGenerator Prompt: # app/prompts/nl_to_gherkin.txt
 You are an expert test automation assistant.
 
-Given the following natural language test description, generate a list of test steps as a JSON array. 
+Given the following natural language test description, generate a list of test steps as complete and detailed as possible as a JSON array. 
 Each item should have:
 - gherkin: the Gherkin step as text (e.g., "When I click the login button")
 - action: the type of action (e.g., "click", "input", "navigate", "wait", "verify")
@@ -26,114 +26,117 @@ Each item should have:
 - value: the value to be used for input actions, or null if not applicable
 
 Test Description:
-Navigate to google
 Search for python
 Click on the first result
 
 Output only the JSON array, no explanations.
-DEBUG    app.infrastructure.ai_client:ai_client.py:212 Sending prompt to Gemini API: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent
-DEBUG    urllib3.connectionpool:connectionpool.py:1049 Starting new HTTPS connection (1): generativelanguage.googleapis.com:443
-DEBUG    urllib3.connectionpool:connectionpool.py:544 https://generativelanguage.googleapis.com:443 "POST /v1beta/models/gemini-2.0-flash:generateContent HTTP/1.1" 200 None
-DEBUG    app.infrastructure.ai_client:ai_client.py:217 Received response from Gemini API: {'candidates': [{'content': {'parts': [{'text': '```json\n[\n  {\n    "gherkin": "Given I navigate to google",\n    "action": "navigate",\n    "target": "google",\n    "value": null\n  },\n  {\n    "gherkin": "When I search for python",\n    "action": "input",\n    "target": "search box",\n    "value": "python"\n  },\n  {\n    "gherkin": "Then I click on the first result",\n    "action": "click",\n    "target": "first result",\n    "value": null\n  }\n]\n```'}], 'role': 'model'}, 'finishReason': 'STOP', 'safetyRatings': [{'category': 'HARM_CATEGORY_HATE_SPEECH', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_HARASSMENT', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'probability': 'NEGLIGIBLE'}], 'avgLogprobs': -0.013026346255392923}], 'usageMetadata': {'promptTokenCount': 161, 'candidatesTokenCount': 137, 'totalTokenCount': 298, 'promptTokensDetails': [{'modality': 'TEXT', 'tokenCount': 161}], 'candidatesTokensDetails': [{'modality': 'TEXT', 'tokenCount': 137}]}, 'modelVersion': 'gemini-2.0-flash'}
-DEBUG    app.infrastructure.ai_generators:ai_generators.py:68 NLToGherkinGenerator Response: ```json
-[
+DEBUG    app.infrastructure.ai_client:ai_client.py:370 Sending prompt to Grok API: https://api.x.ai/v1/chat/completions
+DEBUG    urllib3.connectionpool:connectionpool.py:1049 Starting new HTTPS connection (1): api.x.ai:443
+DEBUG    urllib3.connectionpool:connectionpool.py:544 https://api.x.ai:443 "POST /v1/chat/completions HTTP/1.1" 200 None
+DEBUG    app.infrastructure.ai_client:ai_client.py:375 Received response from Grok API: {'id': 'd6d6469a-2df5-4dbe-9fde-8a2f25a32e21', 'object': 'chat.completion', 'created': 1746330234, 'model': 'grok-3-mini-beta', 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': '[\n  {\n    "gherkin": "Given I am on the search page",\n    "action": "navigate",\n    "target": "search page",\n    "value": null\n  },\n  {\n    "gherkin": "When I enter \'python\' into the search input field",\n    "action": "input",\n    "target": "search input field",\n    "value": "python"\n  },\n  {\n    "gherkin": "When I click the search button",\n    "action": "click",\n    "target": "search button",\n    "value": null\n  },\n  {\n    "gherkin": "Then I wait for the search results to appear",\n    "action": "wait",\n    "target": "search results",\n    "value": null\n  },\n  {\n    "gherkin": "When I click on the first search result",\n    "action": "click",\n    "target": "first search result",\n    "value": null\n  }\n]', 'reasoning_content': 'First, the user wants me to generate a list of test steps based on the natural language description: "Search for python" and "Click on the first result". I need to output this as a JSON array.\n\nEach item in the array should have:\n\n- gherkin: a string representing the Gherkin step, like "When I click the login button"\n\n- action: the type of action, such as "click", "input", "navigate", "wait", "verify"\n\n- target: the UI element or page being acted upon\n\n- value: the value for input actions, or null if not applicable\n\nThe output should be only the JSON array, no explanations.\n\nBreaking down the test description:\n\n1. "Search for python" – This likely involves navigating to a search page, entering "python" into a search input field, and then submitting it.\n\n2. "Click on the first result" – After the search, there should be results, and I need to click on the first one.\n\nI need to expand this into detailed steps. Since it\'s a test automation, I should think about the sequence:\n\n- First, perhaps navigate to the search page if not already there.\n\n- Then, enter the search term.\n\n- Submit the search.\n\n- Wait for results.\n\n- Click on the first result.\n\nThe description is minimal, so I\'ll make it as complete as possible.\n\nPossible steps:\n\n1. Navigate to the homepage or search page.\n\n2. Locate the search input field and enter "python".\n\n3. Locate the search button and click it.\n\n4. Wait for the results to load.\n\n5. Locate the first result and click it.\n\nThe description doesn\'t specify navigating to a page, but it\'s implied. To make it complete, I should include it.\n\nNow, structure each item:\n\nFor example:\n\n- For searching: \n\n  - Gherkin: "When I enter \'python\' into the search field"\n\n  - Action: "input"\n\n  - Target: "search input field"\n\n  - Value: "python"\n\n- Then: "When I click the search button"\n\n  - Action: "click"\n\n  - Target: "search button"\n\n  - Value: null\n\n- After that: "Then I wait for the search results"\n\n  - Action: "wait"\n\n  - Target: "search results element"\n\n  - Value: null or perhaps a timeout value, but I\'ll keep it null\n\n- Finally: "When I click on the first search result"\n\n  - Action: "click"\n\n  - Target: "first search result"\n\n  - Value: null\n\nIn Gherkin, steps usually start with Given, When, Then. But the example given is "When I click the login button", so I\'ll follow that.\n\nThe full array might look like:\n\n[\n\n  {\n\n    "gherkin": "Given I am on the homepage",\n\n    "action": "navigate",\n\n    "target": "homepage",\n\n    "value": null\n\n  },\n\n  {\n\n    "gherkin": "When I enter \'python\' into the search field",\n\n    "action": "input",\n\n    "target": "search input field",\n\n    "value": "python"\n\n  },\n\n  {\n\n    "gherkin": "When I click the search button",\n\n    "action": "click",\n\n    "target": "search button",\n\n    "value": null\n\n  },\n\n  {\n\n    "gherkin": "Then I wait for the search results to load",\n\n    "action": "wait",\n\n    "target": "search results",\n\n    "value": null\n\n  },\n\n  {\n\n    "gherkin": "When I click on the first search result",\n\n    "action": "click",\n\n    "target": "first search result",\n\n    "value": null\n\n  }\n\n]\n\nIs this complete? I think so. I added the navigation step because it\'s necessary for the test to make sense.\n\nFinally, output only the JSON array. So, no extra text, just the array.', 'refusal': None}, 'finish_reason': 'stop'}], 'usage': {'prompt_tokens': 171, 'completion_tokens': 207, 'total_tokens': 1188, 'prompt_tokens_details': {'text_tokens': 171, 'audio_tokens': 0, 'image_tokens': 0, 'cached_tokens': 0}, 'completion_tokens_details': {'reasoning_tokens': 810, 'audio_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}}, 'system_fingerprint': 'fp_8e1ec7635f'}
+DEBUG    app.infrastructure.ai_generators:ai_generators.py:68 NLToGherkinGenerator Response: [
   {
-    "gherkin": "Given I navigate to google",
+    "gherkin": "Given I am on the search page",
     "action": "navigate",
-    "target": "google",
+    "target": "search page",
     "value": null
   },
   {
-    "gherkin": "When I search for python",
+    "gherkin": "When I enter 'python' into the search input field",
     "action": "input",
-    "target": "search box",
+    "target": "search input field",
     "value": "python"
   },
   {
-    "gherkin": "Then I click on the first result",
+    "gherkin": "When I click the search button",
     "action": "click",
-    "target": "first result",
+    "target": "search button",
+    "value": null
+  },
+  {
+    "gherkin": "Then I wait for the search results to appear",
+    "action": "wait",
+    "target": "search results",
+    "value": null
+  },
+  {
+    "gherkin": "When I click on the first search result",
+    "action": "click",
+    "target": "first search result",
     "value": null
   }
 ]
-```
 DEBUG    app.infrastructure.ai_generators:ai_generators.py:71 NLToGherkinGenerator clean_content: [
   {
-    "gherkin": "Given I navigate to google",
+    "gherkin": "Given I am on the search page",
     "action": "navigate",
-    "target": "google",
+    "target": "search page",
     "value": null
   },
   {
-    "gherkin": "When I search for python",
+    "gherkin": "When I enter 'python' into the search input field",
     "action": "input",
-    "target": "search box",
+    "target": "search input field",
     "value": "python"
   },
   {
-    "gherkin": "Then I click on the first result",
+    "gherkin": "When I click the search button",
     "action": "click",
-    "target": "first result",
+    "target": "search button",
+    "value": null
+  },
+  {
+    "gherkin": "Then I wait for the search results to appear",
+    "action": "wait",
+    "target": "search results",
+    "value": null
+  },
+  {
+    "gherkin": "When I click on the first search result",
+    "action": "click",
+    "target": "first search result",
     "value": null
   }
 ]
-DEBUG    app.services.operator_runner:operator_runner.py:84 Creating browser manager
-DEBUG    app.services.operator_runner:operator_runner.py:86 Starting browser
-INFO     app.services.operator_runner:operator_runner.py:89 Browser initialized successfully
-INFO     app.services.operator_runner:operator_runner.py:136 Navigating to URL: https://www.google.com
-DEBUG    app.services.operator_runner:operator_runner.py:142 Navigation attempt 1/3
-DEBUG    app.infrastructure.playwright_manager:playwright_manager.py:258 Executing instruction: goto('https://www.google.com', wait_until='networkidle')
-WARNING  app.infrastructure.playwright_manager:playwright_manager.py:286 Additional waiting failed: Page.wait_for_selector: Timeout 10000ms exceeded.
+INFO     app.infrastructure.ai_generators:ai_generators.py:124 Validating step: {'gherkin': 'Given I am on the search page', 'action': 'navigate', 'target': 'search page', 'value': None}
+DEBUG    app.infrastructure.ai_generators:ai_generators.py:127 Current fields: {'target', 'action', 'value', 'gherkin'}
+DEBUG    app.infrastructure.ai_generators:ai_generators.py:128 Required fields: {'target', 'action', 'gherkin'}
+INFO     app.infrastructure.ai_generators:ai_generators.py:124 Validating step: {'gherkin': "When I enter 'python' into the search input field", 'action': 'input', 'target': 'search input field', 'value': 'python'}
+DEBUG    app.infrastructure.ai_generators:ai_generators.py:127 Current fields: {'target', 'action', 'value', 'gherkin'}
+DEBUG    app.infrastructure.ai_generators:ai_generators.py:128 Required fields: {'target', 'action', 'gherkin'}
+INFO     app.infrastructure.ai_generators:ai_generators.py:124 Validating step: {'gherkin': 'When I click the search button', 'action': 'click', 'target': 'search button', 'value': None}
+DEBUG    app.infrastructure.ai_generators:ai_generators.py:127 Current fields: {'target', 'action', 'value', 'gherkin'}
+DEBUG    app.infrastructure.ai_generators:ai_generators.py:128 Required fields: {'target', 'action', 'gherkin'}
+INFO     app.infrastructure.ai_generators:ai_generators.py:124 Validating step: {'gherkin': 'Then I wait for the search results to appear', 'action': 'wait', 'target': 'search results', 'value': None}
+DEBUG    app.infrastructure.ai_generators:ai_generators.py:127 Current fields: {'target', 'action', 'value', 'gherkin'}
+DEBUG    app.infrastructure.ai_generators:ai_generators.py:128 Required fields: {'target', 'action', 'gherkin'}
+INFO     app.infrastructure.ai_generators:ai_generators.py:124 Validating step: {'gherkin': 'When I click on the first search result', 'action': 'click', 'target': 'first search result', 'value': None}
+DEBUG    app.infrastructure.ai_generators:ai_generators.py:127 Current fields: {'target', 'action', 'value', 'gherkin'}
+DEBUG    app.infrastructure.ai_generators:ai_generators.py:128 Required fields: {'target', 'action', 'gherkin'}
+DEBUG    app.services.operator_runner:operator_runner.py:101 Creating browser manager
+DEBUG    app.services.operator_runner:operator_runner.py:103 Starting browser
+INFO     app.services.operator_runner:operator_runner.py:106 Browser initialized in headed mode
+INFO     app.services.operator_runner:operator_runner.py:167 Navigating to URL: https://www.google.com
+DEBUG    app.services.operator_runner:operator_runner.py:173 Navigation attempt 1/3
+DEBUG    app.infrastructure.playwright_manager:playwright_manager.py:210 Executing instruction: goto('https://www.google.com', { wait_until: 'load', timeout: 30000 })
+WARNING  app.infrastructure.playwright_manager:playwright_manager.py:272 Additional waiting failed: Page.wait_for_selector: Timeout 10000ms exceeded.
 Call log:
 waiting for locator("input[name=\"q\"]") to be visible
 
-DEBUG    app.infrastructure.playwright_manager:playwright_manager.py:258 Executing instruction: url()
-DEBUG    app.infrastructure.playwright_manager:playwright_manager.py:258 Executing instruction: wait_for_load_state('networkidle')
-DEBUG    app.infrastructure.playwright_manager:playwright_manager.py:258 Executing instruction: wait_for_load_state('networkidle', timeout=500)
-DEBUG    app.infrastructure.playwright_manager:playwright_manager.py:258 Executing instruction: wait_for_load_state('domcontentloaded')
-INFO     app.services.operator_runner:operator_runner.py:173 Successfully navigated to https://www.google.com/
-INFO     app.services.operator_runner:operator_runner.py:194 Executing step 1/3: Given I navigate to google
-DEBUG    app.services.operator_runner:operator_runner.py:272 Training data saved to 'snapshot_json.jsonl'
-DEBUG    app.infrastructure.ai_client:ai_client.py:212 Sending prompt to Gemini API: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent
-DEBUG    urllib3.connectionpool:connectionpool.py:1049 Starting new HTTPS connection (1): generativelanguage.googleapis.com:443
-DEBUG    urllib3.connectionpool:connectionpool.py:544 https://generativelanguage.googleapis.com:443 "POST /v1beta/models/gemini-2.0-flash:generateContent HTTP/1.1" 200 None
-DEBUG    app.infrastructure.ai_client:ai_client.py:217 Received response from Gemini API: {'candidates': [{'content': {'parts': [{'text': '```json\n{\n  "high_precision": [\n    "goto(\'https://www.google.com\', wait_until=\'networkidle\')"\n  ],\n  "low_precision": [\n    "goto(\'https://www.google.com\')"\n  ]\n}\n```'}], 'role': 'model'}, 'finishReason': 'STOP', 'safetyRatings': [{'category': 'HARM_CATEGORY_HATE_SPEECH', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_HARASSMENT', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'probability': 'NEGLIGIBLE'}], 'avgLogprobs': -0.0006096030748079694}], 'usageMetadata': {'promptTokenCount': 52222, 'candidatesTokenCount': 63, 'totalTokenCount': 52285, 'promptTokensDetails': [{'modality': 'TEXT', 'tokenCount': 52222}], 'candidatesTokensDetails': [{'modality': 'TEXT', 'tokenCount': 63}]}, 'modelVersion': 'gemini-2.0-flash'}
-DEBUG    app.infrastructure.ai_generators:ai_generators.py:164 Response PlaywrightGenerator: AIResponse(content='```json\n{\n  "high_precision": [\n    "goto(\'https://www.google.com\', wait_until=\'networkidle\')"\n  ],\n  "low_precision": [\n    "goto(\'https://www.google.com\')"\n  ]\n}\n```', metadata={'model': 'gemini-2.0-flash', 'raw_response': {'candidates': [{'content': {'parts': [{'text': '```json\n{\n  "high_precision": [\n    "goto(\'https://www.google.com\', wait_until=\'networkidle\')"\n  ],\n  "low_precision": [\n    "goto(\'https://www.google.com\')"\n  ]\n}\n```'}], 'role': 'model'}, 'finishReason': 'STOP', 'safetyRatings': [{'category': 'HARM_CATEGORY_HATE_SPEECH', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_HARASSMENT', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'probability': 'NEGLIGIBLE'}], 'avgLogprobs': -0.0006096030748079694}], 'usageMetadata': {'promptTokenCount': 52222, 'candidatesTokenCount': 63, 'totalTokenCount': 52285, 'promptTokensDetails': [{'modality': 'TEXT', 'tokenCount': 52222}], 'candidatesTokensDetails': [{'modality': 'TEXT', 'tokenCount': 63}]}, 'modelVersion': 'gemini-2.0-flash'}})
-ERROR    app.infrastructure.ai_generators:ai_generators.py:209 Invalid JSON response: json
-{
-  "high_precision": [
-    "goto('https://www.google.com', wait_until='networkidle')"
-  ],
-  "low_precision": [
-    "goto('https://www.google.com')"
-  ]
-}
-ERROR    app.infrastructure.ai_generators:ai_generators.py:177 AI client error during instruction generation: Invalid Playwright instruction format
-ERROR    app.services.operator_runner:operator_runner.py:367 Step execution failed: cannot access local variable 'instruction_json' where it is not associated with a value
-Traceback (most recent call last):
-  File "/Users/jaimeenrrique/Automation/WebOperatorFromTC/app/infrastructure/ai_generators.py", line 170, in generate_instruction
-    raise StepGenerationException("Invalid Playwright instruction format")
-app.domain.exceptions.StepGenerationException: Invalid Playwright instruction format
-
-The above exception was the direct cause of the following exception:
-
-Traceback (most recent call last):
-  File "/Users/jaimeenrrique/Automation/WebOperatorFromTC/app/services/operator_runner.py", line 279, in _execute_single_step
-    instruction_json = await self.playwright_generator.generate_instruction(
-                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/jaimeenrrique/Automation/WebOperatorFromTC/app/infrastructure/ai_generators.py", line 178, in generate_instruction
-    raise StepGenerationException(f"AI client error: {str(e)}") from e
-app.domain.exceptions.StepGenerationException: AI client error: Invalid Playwright instruction format
-
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
-  File "/Users/jaimeenrrique/Automation/WebOperatorFromTC/app/services/operator_runner.py", line 345, in _execute_single_step
-    playwright_instruction=instruction_json,  # Store the raw JSON for debugging
-                           ^^^^^^^^^^^^^^^^
-UnboundLocalError: cannot access local variable 'instruction_json' where it is not associated with a value
-DEBUG    app.services.operator_runner:operator_runner.py:100 Stopping browser
-DEBUG    app.services.operator_runner:operator_runner.py:107 Browser cleanup completed
+DEBUG    app.infrastructure.playwright_manager:playwright_manager.py:210 Executing instruction: page.wait_for_load_state('networkidle', timeout=30000)
+DEBUG    app.infrastructure.playwright_manager:playwright_manager.py:296 Instruction page.wait_for_load_state('networkidle', timeout=30000)
+INFO     app.services.operator_runner:operator_runner.py:185 Successfully navigated to https://www.google.com
+INFO     app.services.operator_runner:operator_runner.py:203 --------------------------------------Gherkin Step #0---------------------------------
+INFO     app.services.operator_runner:operator_runner.py:204 Executing step 1/5: Given I am on the search page
+DEBUG    app.services.operator_runner:operator_runner.py:206 Skipping first navigation step as it's asserting initial state
+INFO     app.services.operator_runner:operator_runner.py:203 --------------------------------------Gherkin Step #1---------------------------------
+INFO     app.services.operator_runner:operator_runner.py:204 Executing step 2/5: When I enter 'python' into the search input field
+DEBUG    app.services.operator_runner:operator_runner.py:283 Training data saved via SnapshotStorage
+DEBUG    app.infrastructure.ai_client:ai_client.py:370 Sending prompt to Grok API: https://api.x.ai/v1/chat/completions
+DEBUG    urllib3.connectionpool:connectionpool.py:1049 Starting new HTTPS connection (1): api.x.ai:443
+DEBUG    app.services.operator_runner:operator_runner.py:115 Stopping browser
+ERROR    app.infrastructure.playwright_manager:playwright_manager.py:178 Error during browser cleanup: BrowserContext.close: Target page, context or browser has been closed
+DEBUG    app.services.operator_runner:operator_runner.py:122 Browser cleanup completed
 FAILED                                                                   [100%]
 ------------------------------ live log teardown -------------------------------
 DEBUG    asyncio:selector_events.py:64 Using selector: KqueueSelector
@@ -142,14 +145,14 @@ DEBUG    asyncio:selector_events.py:64 Using selector: KqueueSelector
 =================================== FAILURES ===================================
 ____________ TestOperatorRunnerIntegration.test_google_search_flow _____________
 
-self = <test_operator_runner.TestOperatorRunnerIntegration object at 0x11ffa44a0>
-runner = <app.services.operator_runner.OperatorRunnerService object at 0x11ff0ffe0>
+self = <test_operator_runner.TestOperatorRunnerIntegration object at 0x11a31d6d0>
+runner = <app.services.operator_runner.OperatorRunnerService object at 0x11a2cc2f0>
 
     @pytest.mark.asyncio
     async def test_google_search_flow(self, runner):
         # Natural language steps describing the test scenario
         nl_steps = (
-            "Navigate to google\n"
+            #"Navigate to google\n"
             "Search for python\n"
             "Click on the first result"
         )
@@ -162,25 +165,26 @@ runner = <app.services.operator_runner.OperatorRunnerService object at 0x11ff0ff
     
         # Assert overall success
 >       assert result.success, f"Operator run failed: {result.error_message}"
-E       AssertionError: Operator run failed: Step execution failed: cannot access local variable 'instruction_json' where it is not associated with a value
+E       AssertionError: Operator run failed: Step generation/execution failed: Playwright instruction generation failed: name 'json' is not defined
 E       assert False
-E        +  where False = OperatorCaseResult(success=False, steps_results=[], start_time=datetime.datetime(2025, 4, 27, 11, 26, 35, 87094), end_time=datetime.datetime(2025, 4, 27, 11, 27, 3, 101057), total_duration=28.013963, error_message="Step execution failed: cannot access local variable 'instruction_json' where it is not associated with a value", metadata={'request_id': '56984310-70d6-42cd-a424-4b22c9f52527'}).success
+E        +  where False = OperatorCaseResult(success=False, steps_results=[StepExecutionResult(natural_language_step='Click on the first result', gherkin_step=GherkinStep(gherkin="When I enter 'python' into the search input field", action='input', target='search input field', value='python'), execution_result=ExecutionResult(success=False, screenshot_path=None, error_message="Step generation/execution failed: Playwright instruction generation failed: name 'json' is not defined", page_url='https://www.google.com/', execution_time=252.812331, result=None), playwright_instruction=None, snapshot_json={'role': 'WebArea', 'name': 'Google', 'children': [{'role': 'generic', 'name': '.L3eUgb{display:flex;flex-direction:column;height:100%}.o3j99{flex-shrink:0;box-sizing:border-box}.n1xJcf{height:60px}.LLD4me{min-height:150px;height:calc(100% - 560px);max-height:290px}.yr19Zb{min-height:92px}.ikrT4e{max-height:160px}.mwht9d{display:none}.ADHj4e{padding-top:0px;padding-bottom:85px}.oWyZre{width:100%;height:500px;border-width:0}.qarstb{flex-grow:1}'}, {'role': 'generic', 'name': '', 'attributes': {'class': 'L3eUgb'}, 'children': [{'role': 'navigation', 'name': '', 'attributes': {'class': 'o3j99 n1xJcf Ne6nSd', 'role':...d\\x22kEOk4d\\x22 style\\x3d\\x22height:20px;line-height:20px;width:20px\\x22 data-ved\\x3d\\x220ahUKEwi-_s-S84iNAxWJSzABHbFDCyQQmIkGCA0\\x22\\x3e\\x3csvg focusable\\x3d\\x22false\\x22 xmlns\\x3d\\x22http://www.w3.org/2000/svg\\x22 viewBox\\x3d\\x220 0 24 24\\x22\\x3e\\x3cpath d\\x3d\\x22M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z\\x22\\x3e\\x3c/path\\x3e\\x3c/svg\\x3e\\x3c/span\\x3e\\x3cdiv class\\x3d\\x22C85rO\\x22 aria-level\\x3d\\x221\\x22 role\\x3d\\x22heading\\x22\\x3eKies waarover je feedback geeft\\x3c/div\\x3e\');})();(function(){google.drty&&google.drty(undefined,true);})();});if (!google.stvsc){google.drty && google.drty(undefined,true);}'}]}, start_time=datetime.datetime(2025, 5, 3, 23, 44, 27, 837821), end_time=datetime.datetime(2025, 5, 3, 23, 48, 40, 650152), duration=252.812331)], start_time=datetime.datetime(2025, 5, 3, 23, 43, 53, 563261), end_time=datetime.datetime(2025, 5, 3, 23, 48, 40, 774594), total_duration=287.211333, error_message="Step generation/execution failed: Playwright instruction generation failed: name 'json' is not defined", metadata={'request_id': 'de7c66e0-77cb-4d24-98a9-7f818b3afb6c'}).success
 
 tests/integration/test_operator_runner.py:182: AssertionError
 ---------------------------- Captured stdout setup -----------------------------
-[2025-04-27 11:26:35] [INFO] [app.infrastructure.ai_client] Successfully initialized Gemini API client with model: gemini-2.0-flash
-[2025-04-27 11:26:35] [INFO] [app.infrastructure.ai_client] Successfully initialized Gemini API client with model: gemini-2.0-flash
+[2025-05-03 23:43:53] [INFO] [app.infrastructure.ai_client] Successfully initialized Grok API client with model: grok-3-mini-beta
+[2025-05-03 23:43:53] [INFO] [app.infrastructure.ai_client] Successfully initialized Grok API client with model: grok-3-mini-beta
 ------------------------------ Captured log setup ------------------------------
 DEBUG    asyncio:selector_events.py:64 Using selector: KqueueSelector
 DEBUG    asyncio:selector_events.py:64 Using selector: KqueueSelector
-INFO     app.infrastructure.ai_client:ai_client.py:158 Successfully initialized Gemini API client with model: gemini-2.0-flash
-INFO     app.infrastructure.ai_client:ai_client.py:158 Successfully initialized Gemini API client with model: gemini-2.0-flash
+INFO     app.infrastructure.ai_client:ai_client.py:334 Successfully initialized Grok API client with model: grok-3-mini-beta
+INFO     app.infrastructure.ai_client:ai_client.py:334 Successfully initialized Grok API client with model: grok-3-mini-beta
 ----------------------------- Captured stdout call -----------------------------
-[2025-04-27 11:26:35] [INFO] [app.services.operator_runner] Generating structured Gherkin steps from natural language
-[2025-04-27 11:26:35] [DEBUG] [app.infrastructure.ai_generators] NLToGherkinGenerator Prompt: # app/prompts/nl_to_gherkin.txt
+[2025-05-03 23:43:53] [INFO] [app.services.operator_runner] --------------------------------------Started running Operator------------------------------
+[2025-05-03 23:43:53] [INFO] [app.services.operator_runner] Generating structured Gherkin steps from natural language
+[2025-05-03 23:43:53] [DEBUG] [app.infrastructure.ai_generators] NLToGherkinGenerator Prompt: # app/prompts/nl_to_gherkin.txt
 You are an expert test automation assistant.
 
-Given the following natural language test description, generate a list of test steps as a JSON array. 
+Given the following natural language test description, generate a list of test steps as complete and detailed as possible as a JSON array. 
 Each item should have:
 - gherkin: the Gherkin step as text (e.g., "When I click the login button")
 - action: the type of action (e.g., "click", "input", "navigate", "wait", "verify")
@@ -188,149 +192,121 @@ Each item should have:
 - value: the value to be used for input actions, or null if not applicable
 
 Test Description:
-Navigate to google
 Search for python
 Click on the first result
 
 Output only the JSON array, no explanations.
-[2025-04-27 11:26:35] [DEBUG] [app.infrastructure.ai_client] Sending prompt to Gemini API: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent
-[2025-04-27 11:26:36] [DEBUG] [app.infrastructure.ai_client] Received response from Gemini API: {'candidates': [{'content': {'parts': [{'text': '```json\n[\n  {\n    "gherkin": "Given I navigate to google",\n    "action": "navigate",\n    "target": "google",\n    "value": null\n  },\n  {\n    "gherkin": "When I search for python",\n    "action": "input",\n    "target": "search box",\n    "value": "python"\n  },\n  {\n    "gherkin": "Then I click on the first result",\n    "action": "click",\n    "target": "first result",\n    "value": null\n  }\n]\n```'}], 'role': 'model'}, 'finishReason': 'STOP', 'safetyRatings': [{'category': 'HARM_CATEGORY_HATE_SPEECH', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_HARASSMENT', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'probability': 'NEGLIGIBLE'}], 'avgLogprobs': -0.013026346255392923}], 'usageMetadata': {'promptTokenCount': 161, 'candidatesTokenCount': 137, 'totalTokenCount': 298, 'promptTokensDetails': [{'modality': 'TEXT', 'tokenCount': 161}], 'candidatesTokensDetails': [{'modality': 'TEXT', 'tokenCount': 137}]}, 'modelVersion': 'gemini-2.0-flash'}
-[2025-04-27 11:26:36] [DEBUG] [app.infrastructure.ai_generators] NLToGherkinGenerator Response: ```json
-[
+[2025-05-03 23:43:53] [DEBUG] [app.infrastructure.ai_client] Sending prompt to Grok API: https://api.x.ai/v1/chat/completions
+[2025-05-03 23:44:05] [DEBUG] [app.infrastructure.ai_client] Received response from Grok API: {'id': 'd6d6469a-2df5-4dbe-9fde-8a2f25a32e21', 'object': 'chat.completion', 'created': 1746330234, 'model': 'grok-3-mini-beta', 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': '[\n  {\n    "gherkin": "Given I am on the search page",\n    "action": "navigate",\n    "target": "search page",\n    "value": null\n  },\n  {\n    "gherkin": "When I enter \'python\' into the search input field",\n    "action": "input",\n    "target": "search input field",\n    "value": "python"\n  },\n  {\n    "gherkin": "When I click the search button",\n    "action": "click",\n    "target": "search button",\n    "value": null\n  },\n  {\n    "gherkin": "Then I wait for the search results to appear",\n    "action": "wait",\n    "target": "search results",\n    "value": null\n  },\n  {\n    "gherkin": "When I click on the first search result",\n    "action": "click",\n    "target": "first search result",\n    "value": null\n  }\n]', 'reasoning_content': 'First, the user wants me to generate a list of test steps based on the natural language description: "Search for python" and "Click on the first result". I need to output this as a JSON array.\n\nEach item in the array should have:\n\n- gherkin: a string representing the Gherkin step, like "When I click the login button"\n\n- action: the type of action, such as "click", "input", "navigate", "wait", "verify"\n\n- target: the UI element or page being acted upon\n\n- value: the value for input actions, or null if not applicable\n\nThe output should be only the JSON array, no explanations.\n\nBreaking down the test description:\n\n1. "Search for python" – This likely involves navigating to a search page, entering "python" into a search input field, and then submitting it.\n\n2. "Click on the first result" – After the search, there should be results, and I need to click on the first one.\n\nI need to expand this into detailed steps. Since it\'s a test automation, I should think about the sequence:\n\n- First, perhaps navigate to the search page if not already there.\n\n- Then, enter the search term.\n\n- Submit the search.\n\n- Wait for results.\n\n- Click on the first result.\n\nThe description is minimal, so I\'ll make it as complete as possible.\n\nPossible steps:\n\n1. Navigate to the homepage or search page.\n\n2. Locate the search input field and enter "python".\n\n3. Locate the search button and click it.\n\n4. Wait for the results to load.\n\n5. Locate the first result and click it.\n\nThe description doesn\'t specify navigating to a page, but it\'s implied. To make it complete, I should include it.\n\nNow, structure each item:\n\nFor example:\n\n- For searching: \n\n  - Gherkin: "When I enter \'python\' into the search field"\n\n  - Action: "input"\n\n  - Target: "search input field"\n\n  - Value: "python"\n\n- Then: "When I click the search button"\n\n  - Action: "click"\n\n  - Target: "search button"\n\n  - Value: null\n\n- After that: "Then I wait for the search results"\n\n  - Action: "wait"\n\n  - Target: "search results element"\n\n  - Value: null or perhaps a timeout value, but I\'ll keep it null\n\n- Finally: "When I click on the first search result"\n\n  - Action: "click"\n\n  - Target: "first search result"\n\n  - Value: null\n\nIn Gherkin, steps usually start with Given, When, Then. But the example given is "When I click the login button", so I\'ll follow that.\n\nThe full array might look like:\n\n[\n\n  {\n\n    "gherkin": "Given I am on the homepage",\n\n    "action": "navigate",\n\n    "target": "homepage",\n\n    "value": null\n\n  },\n\n  {\n\n    "gherkin": "When I enter \'python\' into the search field",\n\n    "action": "input",\n\n    "target": "search input field",\n\n    "value": "python"\n\n  },\n\n  {\n\n    "gherkin": "When I click the search button",\n\n    "action": "click",\n\n    "target": "search button",\n\n    "value": null\n\n  },\n\n  {\n\n    "gherkin": "Then I wait for the search results to load",\n\n    "action": "wait",\n\n    "target": "search results",\n\n    "value": null\n\n  },\n\n  {\n\n    "gherkin": "When I click on the first search result",\n\n    "action": "click",\n\n    "target": "first search result",\n\n    "value": null\n\n  }\n\n]\n\nIs this complete? I think so. I added the navigation step because it\'s necessary for the test to make sense.\n\nFinally, output only the JSON array. So, no extra text, just the array.', 'refusal': None}, 'finish_reason': 'stop'}], 'usage': {'prompt_tokens': 171, 'completion_tokens': 207, 'total_tokens': 1188, 'prompt_tokens_details': {'text_tokens': 171, 'audio_tokens': 0, 'image_tokens': 0, 'cached_tokens': 0}, 'completion_tokens_details': {'reasoning_tokens': 810, 'audio_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}}, 'system_fingerprint': 'fp_8e1ec7635f'}
+[2025-05-03 23:44:05] [DEBUG] [app.infrastructure.ai_generators] NLToGherkinGenerator Response: [
   {
-    "gherkin": "Given I navigate to google",
+    "gherkin": "Given I am on the search page",
     "action": "navigate",
-    "target": "google",
+    "target": "search page",
     "value": null
   },
   {
-    "gherkin": "When I search for python",
+    "gherkin": "When I enter 'python' into the search input field",
     "action": "input",
-    "target": "search box",
+    "target": "search input field",
     "value": "python"
   },
   {
-    "gherkin": "Then I click on the first result",
+    "gherkin": "When I click the search button",
     "action": "click",
-    "target": "first result",
-    "value": null
-  }
-]
-```
-[2025-04-27 11:26:36] [DEBUG] [app.infrastructure.ai_generators] NLToGherkinGenerator clean_content: [
-  {
-    "gherkin": "Given I navigate to google",
-    "action": "navigate",
-    "target": "google",
+    "target": "search button",
     "value": null
   },
   {
-    "gherkin": "When I search for python",
+    "gherkin": "Then I wait for the search results to appear",
+    "action": "wait",
+    "target": "search results",
+    "value": null
+  },
+  {
+    "gherkin": "When I click on the first search result",
+    "action": "click",
+    "target": "first search result",
+    "value": null
+  }
+]
+[2025-05-03 23:44:05] [DEBUG] [app.infrastructure.ai_generators] NLToGherkinGenerator clean_content: [
+  {
+    "gherkin": "Given I am on the search page",
+    "action": "navigate",
+    "target": "search page",
+    "value": null
+  },
+  {
+    "gherkin": "When I enter 'python' into the search input field",
     "action": "input",
-    "target": "search box",
+    "target": "search input field",
     "value": "python"
   },
   {
-    "gherkin": "Then I click on the first result",
+    "gherkin": "When I click the search button",
     "action": "click",
-    "target": "first result",
-    "value": null
-  }
-]
-
-Validating response: [
-  {
-    "gherkin": "Given I navigate to google",
-    "action": "navigate",
-    "target": "google",
+    "target": "search button",
     "value": null
   },
   {
-    "gherkin": "When I search for python",
-    "action": "input",
-    "target": "search box",
-    "value": "python"
+    "gherkin": "Then I wait for the search results to appear",
+    "action": "wait",
+    "target": "search results",
+    "value": null
   },
   {
-    "gherkin": "Then I click on the first result",
+    "gherkin": "When I click on the first search result",
     "action": "click",
-    "target": "first result",
+    "target": "first search result",
     "value": null
   }
 ]
-Response type: <class 'str'>
-Parsed JSON: [{'gherkin': 'Given I navigate to google', 'action': 'navigate', 'target': 'google', 'value': None}, {'gherkin': 'When I search for python', 'action': 'input', 'target': 'search box', 'value': 'python'}, {'gherkin': 'Then I click on the first result', 'action': 'click', 'target': 'first result', 'value': None}]
-JSON type: <class 'list'>
-Validating step: {'gherkin': 'Given I navigate to google', 'action': 'navigate', 'target': 'google', 'value': None}
-Current fields: {'value', 'target', 'action', 'gherkin'}
-Required fields: {'target', 'action', 'gherkin'}
-Validating step: {'gherkin': 'When I search for python', 'action': 'input', 'target': 'search box', 'value': 'python'}
-Current fields: {'value', 'target', 'action', 'gherkin'}
-Required fields: {'target', 'action', 'gherkin'}
-Validating step: {'gherkin': 'Then I click on the first result', 'action': 'click', 'target': 'first result', 'value': None}
-Current fields: {'value', 'target', 'action', 'gherkin'}
-Required fields: {'target', 'action', 'gherkin'}
-[2025-04-27 11:26:36] [DEBUG] [app.services.operator_runner] Creating browser manager
-[2025-04-27 11:26:36] [DEBUG] [app.services.operator_runner] Starting browser
-[2025-04-27 11:26:40] [INFO] [app.services.operator_runner] Browser initialized successfully
-[2025-04-27 11:26:40] [INFO] [app.services.operator_runner] Navigating to URL: https://www.google.com
-[2025-04-27 11:26:40] [DEBUG] [app.services.operator_runner] Navigation attempt 1/3
-[2025-04-27 11:26:40] [DEBUG] [app.infrastructure.playwright_manager] Executing instruction: goto('https://www.google.com', wait_until='networkidle')
-[2025-04-27 11:26:55] [WARNING] [app.infrastructure.playwright_manager] Additional waiting failed: Page.wait_for_selector: Timeout 10000ms exceeded.
+[2025-05-03 23:44:05] [INFO] [app.infrastructure.ai_generators] Validating step: {'gherkin': 'Given I am on the search page', 'action': 'navigate', 'target': 'search page', 'value': None}
+[2025-05-03 23:44:05] [DEBUG] [app.infrastructure.ai_generators] Current fields: {'target', 'action', 'value', 'gherkin'}
+[2025-05-03 23:44:05] [DEBUG] [app.infrastructure.ai_generators] Required fields: {'target', 'action', 'gherkin'}
+[2025-05-03 23:44:05] [INFO] [app.infrastructure.ai_generators] Validating step: {'gherkin': "When I enter 'python' into the search input field", 'action': 'input', 'target': 'search input field', 'value': 'python'}
+[2025-05-03 23:44:05] [DEBUG] [app.infrastructure.ai_generators] Current fields: {'target', 'action', 'value', 'gherkin'}
+[2025-05-03 23:44:05] [DEBUG] [app.infrastructure.ai_generators] Required fields: {'target', 'action', 'gherkin'}
+[2025-05-03 23:44:05] [INFO] [app.infrastructure.ai_generators] Validating step: {'gherkin': 'When I click the search button', 'action': 'click', 'target': 'search button', 'value': None}
+[2025-05-03 23:44:05] [DEBUG] [app.infrastructure.ai_generators] Current fields: {'target', 'action', 'value', 'gherkin'}
+[2025-05-03 23:44:05] [DEBUG] [app.infrastructure.ai_generators] Required fields: {'target', 'action', 'gherkin'}
+[2025-05-03 23:44:05] [INFO] [app.infrastructure.ai_generators] Validating step: {'gherkin': 'Then I wait for the search results to appear', 'action': 'wait', 'target': 'search results', 'value': None}
+[2025-05-03 23:44:05] [DEBUG] [app.infrastructure.ai_generators] Current fields: {'target', 'action', 'value', 'gherkin'}
+[2025-05-03 23:44:05] [DEBUG] [app.infrastructure.ai_generators] Required fields: {'target', 'action', 'gherkin'}
+[2025-05-03 23:44:05] [INFO] [app.infrastructure.ai_generators] Validating step: {'gherkin': 'When I click on the first search result', 'action': 'click', 'target': 'first search result', 'value': None}
+[2025-05-03 23:44:05] [DEBUG] [app.infrastructure.ai_generators] Current fields: {'target', 'action', 'value', 'gherkin'}
+[2025-05-03 23:44:05] [DEBUG] [app.infrastructure.ai_generators] Required fields: {'target', 'action', 'gherkin'}
+[2025-05-03 23:44:05] [DEBUG] [app.services.operator_runner] Creating browser manager
+[2025-05-03 23:44:05] [DEBUG] [app.services.operator_runner] Starting browser
+[2025-05-03 23:44:11] [INFO] [app.services.operator_runner] Browser initialized in headed mode
+[2025-05-03 23:44:11] [INFO] [app.services.operator_runner] Navigating to URL: https://www.google.com
+[2025-05-03 23:44:11] [DEBUG] [app.services.operator_runner] Navigation attempt 1/3
+[2025-05-03 23:44:11] [DEBUG] [app.infrastructure.playwright_manager] Executing instruction: goto('https://www.google.com', { wait_until: 'load', timeout: 30000 })
+[2025-05-03 23:44:27] [WARNING] [app.infrastructure.playwright_manager] Additional waiting failed: Page.wait_for_selector: Timeout 10000ms exceeded.
 Call log:
 waiting for locator("input[name=\"q\"]") to be visible
 
-[2025-04-27 11:26:55] [DEBUG] [app.infrastructure.playwright_manager] Executing instruction: url()
-[2025-04-27 11:26:55] [DEBUG] [app.infrastructure.playwright_manager] Executing instruction: wait_for_load_state('networkidle')
-[2025-04-27 11:26:55] [DEBUG] [app.infrastructure.playwright_manager] Executing instruction: wait_for_load_state('networkidle', timeout=500)
-[2025-04-27 11:26:56] [DEBUG] [app.infrastructure.playwright_manager] Executing instruction: wait_for_load_state('domcontentloaded')
-[2025-04-27 11:26:56] [INFO] [app.services.operator_runner] Successfully navigated to https://www.google.com/
-[2025-04-27 11:26:56] [INFO] [app.services.operator_runner] Executing step 1/3: Given I navigate to google
-[2025-04-27 11:26:56] [DEBUG] [app.services.operator_runner] Training data saved to 'snapshot_json.jsonl'
-[2025-04-27 11:26:56] [DEBUG] [app.infrastructure.ai_client] Sending prompt to Gemini API: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent
-[2025-04-27 11:27:02] [DEBUG] [app.infrastructure.ai_client] Received response from Gemini API: {'candidates': [{'content': {'parts': [{'text': '```json\n{\n  "high_precision": [\n    "goto(\'https://www.google.com\', wait_until=\'networkidle\')"\n  ],\n  "low_precision": [\n    "goto(\'https://www.google.com\')"\n  ]\n}\n```'}], 'role': 'model'}, 'finishReason': 'STOP', 'safetyRatings': [{'category': 'HARM_CATEGORY_HATE_SPEECH', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_HARASSMENT', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'probability': 'NEGLIGIBLE'}], 'avgLogprobs': -0.0006096030748079694}], 'usageMetadata': {'promptTokenCount': 52222, 'candidatesTokenCount': 63, 'totalTokenCount': 52285, 'promptTokensDetails': [{'modality': 'TEXT', 'tokenCount': 52222}], 'candidatesTokensDetails': [{'modality': 'TEXT', 'tokenCount': 63}]}, 'modelVersion': 'gemini-2.0-flash'}
-[2025-04-27 11:27:02] [DEBUG] [app.infrastructure.ai_generators] Response PlaywrightGenerator: AIResponse(content='```json\n{\n  "high_precision": [\n    "goto(\'https://www.google.com\', wait_until=\'networkidle\')"\n  ],\n  "low_precision": [\n    "goto(\'https://www.google.com\')"\n  ]\n}\n```', metadata={'model': 'gemini-2.0-flash', 'raw_response': {'candidates': [{'content': {'parts': [{'text': '```json\n{\n  "high_precision": [\n    "goto(\'https://www.google.com\', wait_until=\'networkidle\')"\n  ],\n  "low_precision": [\n    "goto(\'https://www.google.com\')"\n  ]\n}\n```'}], 'role': 'model'}, 'finishReason': 'STOP', 'safetyRatings': [{'category': 'HARM_CATEGORY_HATE_SPEECH', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_HARASSMENT', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'probability': 'NEGLIGIBLE'}], 'avgLogprobs': -0.0006096030748079694}], 'usageMetadata': {'promptTokenCount': 52222, 'candidatesTokenCount': 63, 'totalTokenCount': 52285, 'promptTokensDetails': [{'modality': 'TEXT', 'tokenCount': 52222}], 'candidatesTokensDetails': [{'modality': 'TEXT', 'tokenCount': 63}]}, 'modelVersion': 'gemini-2.0-flash'}})
-[2025-04-27 11:27:02] [ERROR] [app.infrastructure.ai_generators] Invalid JSON response: json
-{
-  "high_precision": [
-    "goto('https://www.google.com', wait_until='networkidle')"
-  ],
-  "low_precision": [
-    "goto('https://www.google.com')"
-  ]
-}
-[2025-04-27 11:27:02] [ERROR] [app.infrastructure.ai_generators] AI client error during instruction generation: Invalid Playwright instruction format
-[2025-04-27 11:27:02] [ERROR] [app.services.operator_runner] Step execution failed: cannot access local variable 'instruction_json' where it is not associated with a value
-Traceback (most recent call last):
-  File "/Users/jaimeenrrique/Automation/WebOperatorFromTC/app/infrastructure/ai_generators.py", line 170, in generate_instruction
-    raise StepGenerationException("Invalid Playwright instruction format")
-app.domain.exceptions.StepGenerationException: Invalid Playwright instruction format
-
-The above exception was the direct cause of the following exception:
-
-Traceback (most recent call last):
-  File "/Users/jaimeenrrique/Automation/WebOperatorFromTC/app/services/operator_runner.py", line 279, in _execute_single_step
-    instruction_json = await self.playwright_generator.generate_instruction(
-                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/jaimeenrrique/Automation/WebOperatorFromTC/app/infrastructure/ai_generators.py", line 178, in generate_instruction
-    raise StepGenerationException(f"AI client error: {str(e)}") from e
-app.domain.exceptions.StepGenerationException: AI client error: Invalid Playwright instruction format
-
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
-  File "/Users/jaimeenrrique/Automation/WebOperatorFromTC/app/services/operator_runner.py", line 345, in _execute_single_step
-    playwright_instruction=instruction_json,  # Store the raw JSON for debugging
-                           ^^^^^^^^^^^^^^^^
-UnboundLocalError: cannot access local variable 'instruction_json' where it is not associated with a value
-[2025-04-27 11:27:02] [DEBUG] [app.services.operator_runner] Stopping browser
-[2025-04-27 11:27:03] [DEBUG] [app.services.operator_runner] Browser cleanup completed
+[2025-05-03 23:44:27] [DEBUG] [app.infrastructure.playwright_manager] Executing instruction: page.wait_for_load_state('networkidle', timeout=30000)
+[2025-05-03 23:44:27] [DEBUG] [app.infrastructure.playwright_manager] Instruction page.wait_for_load_state('networkidle', timeout=30000)
+[2025-05-03 23:44:27] [INFO] [app.services.operator_runner] Successfully navigated to https://www.google.com
+[2025-05-03 23:44:27] [INFO] [app.services.operator_runner] --------------------------------------Gherkin Step #0---------------------------------
+[2025-05-03 23:44:27] [INFO] [app.services.operator_runner] Executing step 1/5: Given I am on the search page
+[2025-05-03 23:44:27] [DEBUG] [app.services.operator_runner] Skipping first navigation step as it's asserting initial state
+[2025-05-03 23:44:27] [INFO] [app.services.operator_runner] --------------------------------------Gherkin Step #1---------------------------------
+[2025-05-03 23:44:27] [INFO] [app.services.operator_runner] Executing step 2/5: When I enter 'python' into the search input field
+[2025-05-03 23:44:28] [DEBUG] [app.services.operator_runner] Training data saved via SnapshotStorage
+[2025-05-03 23:44:28] [DEBUG] [app.infrastructure.ai_client] Sending prompt to Grok API: https://api.x.ai/v1/chat/completions
+[2025-05-03 23:48:40] [DEBUG] [app.services.operator_runner] Stopping browser
+[2025-05-03 23:48:40] [ERROR] [app.infrastructure.playwright_manager] Error during browser cleanup: BrowserContext.close: Target page, context or browser has been closed
+[2025-05-03 23:48:40] [DEBUG] [app.services.operator_runner] Browser cleanup completed
 ------------------------------ Captured log call -------------------------------
-INFO     app.services.operator_runner:operator_runner.py:124 Generating structured Gherkin steps from natural language
+INFO     app.services.operator_runner:operator_runner.py:156 --------------------------------------Started running Operator------------------------------
+INFO     app.services.operator_runner:operator_runner.py:157 Generating structured Gherkin steps from natural language
 DEBUG    app.infrastructure.ai_generators:ai_generators.py:62 NLToGherkinGenerator Prompt: # app/prompts/nl_to_gherkin.txt
 You are an expert test automation assistant.
 
-Given the following natural language test description, generate a list of test steps as a JSON array. 
+Given the following natural language test description, generate a list of test steps as complete and detailed as possible as a JSON array. 
 Each item should have:
 - gherkin: the Gherkin step as text (e.g., "When I click the login button")
 - action: the type of action (e.g., "click", "input", "navigate", "wait", "verify")
@@ -338,116 +314,125 @@ Each item should have:
 - value: the value to be used for input actions, or null if not applicable
 
 Test Description:
-Navigate to google
 Search for python
 Click on the first result
 
 Output only the JSON array, no explanations.
-DEBUG    app.infrastructure.ai_client:ai_client.py:212 Sending prompt to Gemini API: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent
-DEBUG    urllib3.connectionpool:connectionpool.py:1049 Starting new HTTPS connection (1): generativelanguage.googleapis.com:443
-DEBUG    urllib3.connectionpool:connectionpool.py:544 https://generativelanguage.googleapis.com:443 "POST /v1beta/models/gemini-2.0-flash:generateContent HTTP/1.1" 200 None
-DEBUG    app.infrastructure.ai_client:ai_client.py:217 Received response from Gemini API: {'candidates': [{'content': {'parts': [{'text': '```json\n[\n  {\n    "gherkin": "Given I navigate to google",\n    "action": "navigate",\n    "target": "google",\n    "value": null\n  },\n  {\n    "gherkin": "When I search for python",\n    "action": "input",\n    "target": "search box",\n    "value": "python"\n  },\n  {\n    "gherkin": "Then I click on the first result",\n    "action": "click",\n    "target": "first result",\n    "value": null\n  }\n]\n```'}], 'role': 'model'}, 'finishReason': 'STOP', 'safetyRatings': [{'category': 'HARM_CATEGORY_HATE_SPEECH', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_HARASSMENT', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'probability': 'NEGLIGIBLE'}], 'avgLogprobs': -0.013026346255392923}], 'usageMetadata': {'promptTokenCount': 161, 'candidatesTokenCount': 137, 'totalTokenCount': 298, 'promptTokensDetails': [{'modality': 'TEXT', 'tokenCount': 161}], 'candidatesTokensDetails': [{'modality': 'TEXT', 'tokenCount': 137}]}, 'modelVersion': 'gemini-2.0-flash'}
-DEBUG    app.infrastructure.ai_generators:ai_generators.py:68 NLToGherkinGenerator Response: ```json
-[
+DEBUG    app.infrastructure.ai_client:ai_client.py:370 Sending prompt to Grok API: https://api.x.ai/v1/chat/completions
+DEBUG    urllib3.connectionpool:connectionpool.py:1049 Starting new HTTPS connection (1): api.x.ai:443
+DEBUG    urllib3.connectionpool:connectionpool.py:544 https://api.x.ai:443 "POST /v1/chat/completions HTTP/1.1" 200 None
+DEBUG    app.infrastructure.ai_client:ai_client.py:375 Received response from Grok API: {'id': 'd6d6469a-2df5-4dbe-9fde-8a2f25a32e21', 'object': 'chat.completion', 'created': 1746330234, 'model': 'grok-3-mini-beta', 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': '[\n  {\n    "gherkin": "Given I am on the search page",\n    "action": "navigate",\n    "target": "search page",\n    "value": null\n  },\n  {\n    "gherkin": "When I enter \'python\' into the search input field",\n    "action": "input",\n    "target": "search input field",\n    "value": "python"\n  },\n  {\n    "gherkin": "When I click the search button",\n    "action": "click",\n    "target": "search button",\n    "value": null\n  },\n  {\n    "gherkin": "Then I wait for the search results to appear",\n    "action": "wait",\n    "target": "search results",\n    "value": null\n  },\n  {\n    "gherkin": "When I click on the first search result",\n    "action": "click",\n    "target": "first search result",\n    "value": null\n  }\n]', 'reasoning_content': 'First, the user wants me to generate a list of test steps based on the natural language description: "Search for python" and "Click on the first result". I need to output this as a JSON array.\n\nEach item in the array should have:\n\n- gherkin: a string representing the Gherkin step, like "When I click the login button"\n\n- action: the type of action, such as "click", "input", "navigate", "wait", "verify"\n\n- target: the UI element or page being acted upon\n\n- value: the value for input actions, or null if not applicable\n\nThe output should be only the JSON array, no explanations.\n\nBreaking down the test description:\n\n1. "Search for python" – This likely involves navigating to a search page, entering "python" into a search input field, and then submitting it.\n\n2. "Click on the first result" – After the search, there should be results, and I need to click on the first one.\n\nI need to expand this into detailed steps. Since it\'s a test automation, I should think about the sequence:\n\n- First, perhaps navigate to the search page if not already there.\n\n- Then, enter the search term.\n\n- Submit the search.\n\n- Wait for results.\n\n- Click on the first result.\n\nThe description is minimal, so I\'ll make it as complete as possible.\n\nPossible steps:\n\n1. Navigate to the homepage or search page.\n\n2. Locate the search input field and enter "python".\n\n3. Locate the search button and click it.\n\n4. Wait for the results to load.\n\n5. Locate the first result and click it.\n\nThe description doesn\'t specify navigating to a page, but it\'s implied. To make it complete, I should include it.\n\nNow, structure each item:\n\nFor example:\n\n- For searching: \n\n  - Gherkin: "When I enter \'python\' into the search field"\n\n  - Action: "input"\n\n  - Target: "search input field"\n\n  - Value: "python"\n\n- Then: "When I click the search button"\n\n  - Action: "click"\n\n  - Target: "search button"\n\n  - Value: null\n\n- After that: "Then I wait for the search results"\n\n  - Action: "wait"\n\n  - Target: "search results element"\n\n  - Value: null or perhaps a timeout value, but I\'ll keep it null\n\n- Finally: "When I click on the first search result"\n\n  - Action: "click"\n\n  - Target: "first search result"\n\n  - Value: null\n\nIn Gherkin, steps usually start with Given, When, Then. But the example given is "When I click the login button", so I\'ll follow that.\n\nThe full array might look like:\n\n[\n\n  {\n\n    "gherkin": "Given I am on the homepage",\n\n    "action": "navigate",\n\n    "target": "homepage",\n\n    "value": null\n\n  },\n\n  {\n\n    "gherkin": "When I enter \'python\' into the search field",\n\n    "action": "input",\n\n    "target": "search input field",\n\n    "value": "python"\n\n  },\n\n  {\n\n    "gherkin": "When I click the search button",\n\n    "action": "click",\n\n    "target": "search button",\n\n    "value": null\n\n  },\n\n  {\n\n    "gherkin": "Then I wait for the search results to load",\n\n    "action": "wait",\n\n    "target": "search results",\n\n    "value": null\n\n  },\n\n  {\n\n    "gherkin": "When I click on the first search result",\n\n    "action": "click",\n\n    "target": "first search result",\n\n    "value": null\n\n  }\n\n]\n\nIs this complete? I think so. I added the navigation step because it\'s necessary for the test to make sense.\n\nFinally, output only the JSON array. So, no extra text, just the array.', 'refusal': None}, 'finish_reason': 'stop'}], 'usage': {'prompt_tokens': 171, 'completion_tokens': 207, 'total_tokens': 1188, 'prompt_tokens_details': {'text_tokens': 171, 'audio_tokens': 0, 'image_tokens': 0, 'cached_tokens': 0}, 'completion_tokens_details': {'reasoning_tokens': 810, 'audio_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}}, 'system_fingerprint': 'fp_8e1ec7635f'}
+DEBUG    app.infrastructure.ai_generators:ai_generators.py:68 NLToGherkinGenerator Response: [
   {
-    "gherkin": "Given I navigate to google",
+    "gherkin": "Given I am on the search page",
     "action": "navigate",
-    "target": "google",
+    "target": "search page",
     "value": null
   },
   {
-    "gherkin": "When I search for python",
+    "gherkin": "When I enter 'python' into the search input field",
     "action": "input",
-    "target": "search box",
+    "target": "search input field",
     "value": "python"
   },
   {
-    "gherkin": "Then I click on the first result",
+    "gherkin": "When I click the search button",
     "action": "click",
-    "target": "first result",
+    "target": "search button",
+    "value": null
+  },
+  {
+    "gherkin": "Then I wait for the search results to appear",
+    "action": "wait",
+    "target": "search results",
+    "value": null
+  },
+  {
+    "gherkin": "When I click on the first search result",
+    "action": "click",
+    "target": "first search result",
     "value": null
   }
 ]
-```
 DEBUG    app.infrastructure.ai_generators:ai_generators.py:71 NLToGherkinGenerator clean_content: [
   {
-    "gherkin": "Given I navigate to google",
+    "gherkin": "Given I am on the search page",
     "action": "navigate",
-    "target": "google",
+    "target": "search page",
     "value": null
   },
   {
-    "gherkin": "When I search for python",
+    "gherkin": "When I enter 'python' into the search input field",
     "action": "input",
-    "target": "search box",
+    "target": "search input field",
     "value": "python"
   },
   {
-    "gherkin": "Then I click on the first result",
+    "gherkin": "When I click the search button",
     "action": "click",
-    "target": "first result",
+    "target": "search button",
+    "value": null
+  },
+  {
+    "gherkin": "Then I wait for the search results to appear",
+    "action": "wait",
+    "target": "search results",
+    "value": null
+  },
+  {
+    "gherkin": "When I click on the first search result",
+    "action": "click",
+    "target": "first search result",
     "value": null
   }
 ]
-DEBUG    app.services.operator_runner:operator_runner.py:84 Creating browser manager
-DEBUG    app.services.operator_runner:operator_runner.py:86 Starting browser
-INFO     app.services.operator_runner:operator_runner.py:89 Browser initialized successfully
-INFO     app.services.operator_runner:operator_runner.py:136 Navigating to URL: https://www.google.com
-DEBUG    app.services.operator_runner:operator_runner.py:142 Navigation attempt 1/3
-DEBUG    app.infrastructure.playwright_manager:playwright_manager.py:258 Executing instruction: goto('https://www.google.com', wait_until='networkidle')
-WARNING  app.infrastructure.playwright_manager:playwright_manager.py:286 Additional waiting failed: Page.wait_for_selector: Timeout 10000ms exceeded.
+INFO     app.infrastructure.ai_generators:ai_generators.py:124 Validating step: {'gherkin': 'Given I am on the search page', 'action': 'navigate', 'target': 'search page', 'value': None}
+DEBUG    app.infrastructure.ai_generators:ai_generators.py:127 Current fields: {'target', 'action', 'value', 'gherkin'}
+DEBUG    app.infrastructure.ai_generators:ai_generators.py:128 Required fields: {'target', 'action', 'gherkin'}
+INFO     app.infrastructure.ai_generators:ai_generators.py:124 Validating step: {'gherkin': "When I enter 'python' into the search input field", 'action': 'input', 'target': 'search input field', 'value': 'python'}
+DEBUG    app.infrastructure.ai_generators:ai_generators.py:127 Current fields: {'target', 'action', 'value', 'gherkin'}
+DEBUG    app.infrastructure.ai_generators:ai_generators.py:128 Required fields: {'target', 'action', 'gherkin'}
+INFO     app.infrastructure.ai_generators:ai_generators.py:124 Validating step: {'gherkin': 'When I click the search button', 'action': 'click', 'target': 'search button', 'value': None}
+DEBUG    app.infrastructure.ai_generators:ai_generators.py:127 Current fields: {'target', 'action', 'value', 'gherkin'}
+DEBUG    app.infrastructure.ai_generators:ai_generators.py:128 Required fields: {'target', 'action', 'gherkin'}
+INFO     app.infrastructure.ai_generators:ai_generators.py:124 Validating step: {'gherkin': 'Then I wait for the search results to appear', 'action': 'wait', 'target': 'search results', 'value': None}
+DEBUG    app.infrastructure.ai_generators:ai_generators.py:127 Current fields: {'target', 'action', 'value', 'gherkin'}
+DEBUG    app.infrastructure.ai_generators:ai_generators.py:128 Required fields: {'target', 'action', 'gherkin'}
+INFO     app.infrastructure.ai_generators:ai_generators.py:124 Validating step: {'gherkin': 'When I click on the first search result', 'action': 'click', 'target': 'first search result', 'value': None}
+DEBUG    app.infrastructure.ai_generators:ai_generators.py:127 Current fields: {'target', 'action', 'value', 'gherkin'}
+DEBUG    app.infrastructure.ai_generators:ai_generators.py:128 Required fields: {'target', 'action', 'gherkin'}
+DEBUG    app.services.operator_runner:operator_runner.py:101 Creating browser manager
+DEBUG    app.services.operator_runner:operator_runner.py:103 Starting browser
+INFO     app.services.operator_runner:operator_runner.py:106 Browser initialized in headed mode
+INFO     app.services.operator_runner:operator_runner.py:167 Navigating to URL: https://www.google.com
+DEBUG    app.services.operator_runner:operator_runner.py:173 Navigation attempt 1/3
+DEBUG    app.infrastructure.playwright_manager:playwright_manager.py:210 Executing instruction: goto('https://www.google.com', { wait_until: 'load', timeout: 30000 })
+WARNING  app.infrastructure.playwright_manager:playwright_manager.py:272 Additional waiting failed: Page.wait_for_selector: Timeout 10000ms exceeded.
 Call log:
 waiting for locator("input[name=\"q\"]") to be visible
 
-DEBUG    app.infrastructure.playwright_manager:playwright_manager.py:258 Executing instruction: url()
-DEBUG    app.infrastructure.playwright_manager:playwright_manager.py:258 Executing instruction: wait_for_load_state('networkidle')
-DEBUG    app.infrastructure.playwright_manager:playwright_manager.py:258 Executing instruction: wait_for_load_state('networkidle', timeout=500)
-DEBUG    app.infrastructure.playwright_manager:playwright_manager.py:258 Executing instruction: wait_for_load_state('domcontentloaded')
-INFO     app.services.operator_runner:operator_runner.py:173 Successfully navigated to https://www.google.com/
-INFO     app.services.operator_runner:operator_runner.py:194 Executing step 1/3: Given I navigate to google
-DEBUG    app.services.operator_runner:operator_runner.py:272 Training data saved to 'snapshot_json.jsonl'
-DEBUG    app.infrastructure.ai_client:ai_client.py:212 Sending prompt to Gemini API: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent
-DEBUG    urllib3.connectionpool:connectionpool.py:1049 Starting new HTTPS connection (1): generativelanguage.googleapis.com:443
-DEBUG    urllib3.connectionpool:connectionpool.py:544 https://generativelanguage.googleapis.com:443 "POST /v1beta/models/gemini-2.0-flash:generateContent HTTP/1.1" 200 None
-DEBUG    app.infrastructure.ai_client:ai_client.py:217 Received response from Gemini API: {'candidates': [{'content': {'parts': [{'text': '```json\n{\n  "high_precision": [\n    "goto(\'https://www.google.com\', wait_until=\'networkidle\')"\n  ],\n  "low_precision": [\n    "goto(\'https://www.google.com\')"\n  ]\n}\n```'}], 'role': 'model'}, 'finishReason': 'STOP', 'safetyRatings': [{'category': 'HARM_CATEGORY_HATE_SPEECH', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_HARASSMENT', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'probability': 'NEGLIGIBLE'}], 'avgLogprobs': -0.0006096030748079694}], 'usageMetadata': {'promptTokenCount': 52222, 'candidatesTokenCount': 63, 'totalTokenCount': 52285, 'promptTokensDetails': [{'modality': 'TEXT', 'tokenCount': 52222}], 'candidatesTokensDetails': [{'modality': 'TEXT', 'tokenCount': 63}]}, 'modelVersion': 'gemini-2.0-flash'}
-DEBUG    app.infrastructure.ai_generators:ai_generators.py:164 Response PlaywrightGenerator: AIResponse(content='```json\n{\n  "high_precision": [\n    "goto(\'https://www.google.com\', wait_until=\'networkidle\')"\n  ],\n  "low_precision": [\n    "goto(\'https://www.google.com\')"\n  ]\n}\n```', metadata={'model': 'gemini-2.0-flash', 'raw_response': {'candidates': [{'content': {'parts': [{'text': '```json\n{\n  "high_precision": [\n    "goto(\'https://www.google.com\', wait_until=\'networkidle\')"\n  ],\n  "low_precision": [\n    "goto(\'https://www.google.com\')"\n  ]\n}\n```'}], 'role': 'model'}, 'finishReason': 'STOP', 'safetyRatings': [{'category': 'HARM_CATEGORY_HATE_SPEECH', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_DANGEROUS_CONTENT', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_HARASSMENT', 'probability': 'NEGLIGIBLE'}, {'category': 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'probability': 'NEGLIGIBLE'}], 'avgLogprobs': -0.0006096030748079694}], 'usageMetadata': {'promptTokenCount': 52222, 'candidatesTokenCount': 63, 'totalTokenCount': 52285, 'promptTokensDetails': [{'modality': 'TEXT', 'tokenCount': 52222}], 'candidatesTokensDetails': [{'modality': 'TEXT', 'tokenCount': 63}]}, 'modelVersion': 'gemini-2.0-flash'}})
-ERROR    app.infrastructure.ai_generators:ai_generators.py:209 Invalid JSON response: json
-{
-  "high_precision": [
-    "goto('https://www.google.com', wait_until='networkidle')"
-  ],
-  "low_precision": [
-    "goto('https://www.google.com')"
-  ]
-}
-ERROR    app.infrastructure.ai_generators:ai_generators.py:177 AI client error during instruction generation: Invalid Playwright instruction format
-ERROR    app.services.operator_runner:operator_runner.py:367 Step execution failed: cannot access local variable 'instruction_json' where it is not associated with a value
-Traceback (most recent call last):
-  File "/Users/jaimeenrrique/Automation/WebOperatorFromTC/app/infrastructure/ai_generators.py", line 170, in generate_instruction
-    raise StepGenerationException("Invalid Playwright instruction format")
-app.domain.exceptions.StepGenerationException: Invalid Playwright instruction format
-
-The above exception was the direct cause of the following exception:
-
-Traceback (most recent call last):
-  File "/Users/jaimeenrrique/Automation/WebOperatorFromTC/app/services/operator_runner.py", line 279, in _execute_single_step
-    instruction_json = await self.playwright_generator.generate_instruction(
-                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/jaimeenrrique/Automation/WebOperatorFromTC/app/infrastructure/ai_generators.py", line 178, in generate_instruction
-    raise StepGenerationException(f"AI client error: {str(e)}") from e
-app.domain.exceptions.StepGenerationException: AI client error: Invalid Playwright instruction format
-
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
-  File "/Users/jaimeenrrique/Automation/WebOperatorFromTC/app/services/operator_runner.py", line 345, in _execute_single_step
-    playwright_instruction=instruction_json,  # Store the raw JSON for debugging
-                           ^^^^^^^^^^^^^^^^
-UnboundLocalError: cannot access local variable 'instruction_json' where it is not associated with a value
-DEBUG    app.services.operator_runner:operator_runner.py:100 Stopping browser
-DEBUG    app.services.operator_runner:operator_runner.py:107 Browser cleanup completed
+DEBUG    app.infrastructure.playwright_manager:playwright_manager.py:210 Executing instruction: page.wait_for_load_state('networkidle', timeout=30000)
+DEBUG    app.infrastructure.playwright_manager:playwright_manager.py:296 Instruction page.wait_for_load_state('networkidle', timeout=30000)
+INFO     app.services.operator_runner:operator_runner.py:185 Successfully navigated to https://www.google.com
+INFO     app.services.operator_runner:operator_runner.py:203 --------------------------------------Gherkin Step #0---------------------------------
+INFO     app.services.operator_runner:operator_runner.py:204 Executing step 1/5: Given I am on the search page
+DEBUG    app.services.operator_runner:operator_runner.py:206 Skipping first navigation step as it's asserting initial state
+INFO     app.services.operator_runner:operator_runner.py:203 --------------------------------------Gherkin Step #1---------------------------------
+INFO     app.services.operator_runner:operator_runner.py:204 Executing step 2/5: When I enter 'python' into the search input field
+DEBUG    app.services.operator_runner:operator_runner.py:283 Training data saved via SnapshotStorage
+DEBUG    app.infrastructure.ai_client:ai_client.py:370 Sending prompt to Grok API: https://api.x.ai/v1/chat/completions
+DEBUG    urllib3.connectionpool:connectionpool.py:1049 Starting new HTTPS connection (1): api.x.ai:443
+DEBUG    app.services.operator_runner:operator_runner.py:115 Stopping browser
+ERROR    app.infrastructure.playwright_manager:playwright_manager.py:178 Error during browser cleanup: BrowserContext.close: Target page, context or browser has been closed
+DEBUG    app.services.operator_runner:operator_runner.py:122 Browser cleanup completed
 ---------------------------- Captured log teardown -----------------------------
 DEBUG    asyncio:selector_events.py:64 Using selector: KqueueSelector
+=============================== warnings summary ===============================
+tests/integration/test_operator_runner.py::TestOperatorRunnerIntegration::test_google_search_flow
+  /Users/jaimeenrrique/.pyenv/versions/3.12.0/envs/WebTesterAgent/lib/python3.12/site-packages/bs4/builder/_lxml.py:124: DeprecationWarning: The 'strip_cdata' option of HTMLParser() has never done anything and will eventually be removed.
+    parser = parser(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
 =========================== short test summary info ============================
 FAILED tests/integration/test_operator_runner.py::TestOperatorRunnerIntegration::test_google_search_flow
-======================= 1 failed, 8 deselected in 28.07s =======================
+============ 1 failed, 8 deselected, 1 warning in 287.33s (0:04:47) ============
