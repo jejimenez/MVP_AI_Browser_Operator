@@ -246,20 +246,6 @@ WebOperatorFromTC/
 
 │ ├── main.py \# FastAPI application entry point
 
-│ ├── operateXRayTestCases/ \# XRay test case implementations
-
-│ │ ├── HTMLSummarizer.py
-
-│ │ ├── abacus_client.py
-
-│ │ ├── example.py
-
-│ │ ├── login.py
-
-│ │ ├── operateXRay.py
-
-│ │ └── otp.py
-
 │ ├── prompts/ \# AI prompt templates
 
 │ │ └── custom_agents/
