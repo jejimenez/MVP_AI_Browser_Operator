@@ -280,6 +280,12 @@
                                     <div class="step-duration">
                                         <strong>Duration:</strong> ${step.duration.toFixed(2)}s
                                     </div>
+                                    ${step.screenshot_url ? `
+                                        <div class="step-screenshot">
+                                            <strong>Screenshot:</strong>
+                                            <img src="/${step.screenshot_url}" alt="Step screenshot" class="screenshot-image">
+                                        </div>
+                                    ` : ''}
                                 </div>
                             </div>
                         `;
