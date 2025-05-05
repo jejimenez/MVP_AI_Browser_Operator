@@ -161,13 +161,13 @@ class TestOperatorRunner:
             natural_language_steps=TEST_NL_STEPS
         )
 
-        assert not result.success
+        assert result.success is False
         assert result.error_message == "Element not found"
         assert len(result.steps_results) == 2  # Stops after step 2 fails
         for step_result in result.steps_results:
             assert step_result.execution_result.screenshot_path == MOCK_SCREENSHOT_PATH
-        mock_html_summarizer.summarize_html.call_count == 2
-        mock_snapshot_storage.save_snapshot.call_count == 2
+        assert mock_html_summarizer.summarize_html.call_count == 2
+        assert mock_snapshot_storage.save_snapshot.call_count == 2
 
     @pytest.mark.asyncio
     async def test_step_generation_failure(self, test_runner, mock_step_generator, mock_browser_manager):
