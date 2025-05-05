@@ -148,8 +148,6 @@ class TestOperatorRunner:
         mock_browser_manager.execute_step.side_effect = [
             ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # goto
             ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=TEST_URL),  # url
-            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # wait_for_load_state
-            ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=None),  # wait_for_load_state
             ExecutionResult(success=True, screenshot_path=MOCK_SCREENSHOT_PATH, result=SAMPLE_HTML),  # get_page_content (step 2)
             ExecutionResult(
                 success=False,
@@ -163,13 +161,13 @@ class TestOperatorRunner:
             natural_language_steps=TEST_NL_STEPS
         )
 
-        assert not result.success
+        assert result.success is False
         assert result.error_message == "Element not found"
         assert len(result.steps_results) == 2  # Stops after step 2 fails
         for step_result in result.steps_results:
             assert step_result.execution_result.screenshot_path == MOCK_SCREENSHOT_PATH
-        mock_html_summarizer.summarize_html.call_count == 2
-        mock_snapshot_storage.save_snapshot.call_count == 2
+        assert mock_html_summarizer.summarize_html.call_count == 2
+        assert mock_snapshot_storage.save_snapshot.call_count == 2
 
     @pytest.mark.asyncio
     async def test_step_generation_failure(self, test_runner, mock_step_generator, mock_browser_manager):
@@ -228,7 +226,7 @@ class TestOperatorRunner:
         assert len(result.steps_results) == 2  # Excludes skipped navigation step
         for step_result in result.steps_results:
             assert isinstance(step_result, StepExecutionResult)
-            assert step_result.snapshot_before == SAMPLE_HTML
+            assert step_result.snapshot_json == SAMPLE_JSON
             assert step_result.playwright_instruction
             assert isinstance(step_result.start_time, datetime)
             assert isinstance(step_result.end_time, datetime)
