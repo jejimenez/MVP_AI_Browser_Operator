@@ -31,6 +31,13 @@ app.add_middleware(
 # Mount static files
 app.mount("/static", StaticFiles(directory="app"), name="static")
 
+# Mount screenshots directory
+screenshots_dir = settings.browser_config.screenshot_dir
+if os.path.exists(screenshots_dir):
+    app.mount("/screenshots", StaticFiles(directory=screenshots_dir), name="screenshots")
+else:
+    logger.warning(f"Screenshots directory {screenshots_dir} does not exist")
+
 # Include all API routes
 app.include_router(api_router, prefix="/api")
 
