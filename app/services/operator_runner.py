@@ -293,7 +293,7 @@ class OperatorRunnerService(OperatorRunnerInterface):
                                     if execution_result.success:
                                         executed_instruction = fallback_instruction
                                         logger.debug(f"Successfully executed fallback instruction > {fallback_instruction}")
-                                        break
+                                        continue
                                     else:
                                         logger.debug(f"Fallback instruction failed: {execution_result.error_message}")
                                         last_error = execution_result.error_message
@@ -304,7 +304,7 @@ class OperatorRunnerService(OperatorRunnerInterface):
                             continue
                         executed_instruction = instruction
                         logger.debug(f"Successfully executed instruction > {instruction}")
-                        break
+                        continue
 
                     if not executed_instruction:
                         for instruction in instruction_data.get("low_precision", []):
@@ -321,7 +321,7 @@ class OperatorRunnerService(OperatorRunnerInterface):
                                         if execution_result.success:
                                             executed_instruction = fallback_instruction
                                             logger.debug(f"Successfully executed fallback instruction > {fallback_instruction}")
-                                            break
+                                            continue
                                         else:
                                             logger.debug(f"Fallback instruction failed: {execution_result.error_message}")
                                             last_error = execution_result.error_message
@@ -332,7 +332,7 @@ class OperatorRunnerService(OperatorRunnerInterface):
                                 continue
                             executed_instruction = instruction
                             logger.debug(f"Successfully executed instruction > {instruction}")
-                            break
+                            continue
 
                     if not executed_instruction:
                         raise StepExecutionException(
