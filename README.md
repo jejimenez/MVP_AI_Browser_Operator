@@ -60,8 +60,7 @@ handling.
 
     -   GEMINI_API_KEY: API key for Gemini-2.0-flash
 
-    -   TARGET_URL: Default URL for testing (e.g.,
-        > https://dev-psa.dev.ninjarmm.com)
+    -   TARGET_URL: Default URL for testing
 
 **Installation**
 
@@ -100,7 +99,6 @@ python -m venv venv
 
 GEMINI_API_KEY=\<your-gemini-api-key\>
 
-TARGET_URL=https://dev-psa.dev.ninjarmm.com
 
 -   LOG_LEVEL=DEBUG
 
@@ -201,8 +199,8 @@ curl -X POST http://localhost:8000/api/operator/execute \
 -H "X-API-Key: test_key" \
 -H "X-Tenant-ID: test_tenant" \
 -d '{
-    "url": "https://dev-psa.dev.ninjarmm.com/auth/",
-    "test_steps": "Given I am on the login page\nWhen I enter \"username@gmail.com\" into Email field\nAnd I enter \"pass\" into password field\nThen I click Sign in button",
+    "url": "https://playwright.dev/",
+    "test_steps": "1. Click in Get started 2. Click in How to install Playwright ",
     "headless": false
 }'
 

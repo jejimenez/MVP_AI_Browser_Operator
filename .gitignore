@@ -40,3 +40,4 @@ ENV/
 *.png
 *.json
 *.jsonl
+*.log
