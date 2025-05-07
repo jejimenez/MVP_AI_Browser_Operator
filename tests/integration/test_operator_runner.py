@@ -62,6 +62,19 @@ class TestOperatorRunnerIntegration:
         assert len(result.steps_results) > 0
         assert result.total_duration > 0
 
+
+    @pytest.mark.asyncio
+    async def test_successful_operator_execution_python_docs(self, runner, sample_test_case):
+        result = await runner.run_operator_case(
+            url="https://docs.python.org/3.9/tutorial/controlflow.html",
+            natural_language_steps="1. Click in the language select /" \
+            "2. Choose \"French\" option"
+        )
+
+        assert result.success
+        assert len(result.steps_results) > 0
+        assert result.total_duration > 0
+
     @pytest.mark.asyncio
     async def test_playwright_instruction_generation_and_execution(self, runner):
         """
