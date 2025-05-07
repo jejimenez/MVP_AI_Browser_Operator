@@ -458,10 +458,185 @@ class GrokAIClient(AIClientInterface):
         self._temperature = value
         logger.info(f"Temperature updated to: {value}")
 
+class OpenAIClient(AIClientInterface):
+    """Implementation of AIClientInterface for OpenAI API."""
+
+    DEFAULT_MODEL_NAME = "gpt-4-turbo-preview"
+    SYSTEM_PROMPT = """You are a world-class AI assistant designed to help users with their tasks efficiently and effectively. 
+Your capabilities include:
+- Understanding and executing complex instructions
+- Providing accurate and well-reasoned responses
+- Maintaining context and following conversation flow
+- Adapting to user needs and preferences
+- Operating within ethical and safety guidelines
+
+You should:
+- Be proactive in understanding user intent
+- Provide clear, concise, and helpful responses
+- Admit when you're uncertain about something
+- Maintain a professional and friendly tone
+- Focus on delivering high-quality, actionable solutions"""
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model_name: str = "gpt-4-turbo-preview",
+        max_tokens: int = 4096,
+        temperature: float = 0.7,
+        **kwargs: Any,
+    ):
+        """
+        Initializes the OpenAI client.
+
+        Args:
+            api_key: The API key for the OpenAI API.
+            model_name: The name of the OpenAI model to use.
+            max_tokens: Maximum number of tokens in the generated text.
+            temperature: Sampling temperature for the model.
+        """
+        self._api_key = api_key or os.getenv("OPENAI_API_KEY")
+        if not self._api_key:
+            raise ValueError(
+                "API key must be provided or set in OPENAI_API_KEY environment variable"
+            )
+        self._model_name = model_name if model_name is not None else self.DEFAULT_MODEL_NAME
+        self._max_tokens = max_tokens
+        self._temperature = temperature
+        self._base_url = "https://api.openai.com/v1/chat/completions"
+
+        logger.info(f"Successfully initialized OpenAI client with model: {self._model_name}")
+
+    async def send_prompt(self, prompt: str) -> AIResponse:
+        """
+        Sends a prompt to the OpenAI API and retrieves the response.
+
+        Args:
+            prompt: The prompt to send to the API.
+
+        Returns:
+            An AIResponse object containing the generated text.
+
+        Raises:
+            AIClientException: If there is an error communicating with the API.
+        """
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self._api_key}",
+        }
+        payload = {
+            "model": self._model_name,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": self.SYSTEM_PROMPT
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "temperature": self._temperature,
+            "max_tokens": self._max_tokens,
+        }
+
+        logger.debug(f"Sending prompt to OpenAI API: {self._base_url}")
+        try:
+            response = requests.post(self._base_url, headers=headers, json=payload)
+            response.raise_for_status()
+            data = response.json()
+            logger.debug(f"Received response from OpenAI API: {data}")
+            return self._process_response(data)
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"OpenAI API error: {e}")
+            raise AIClientException(f"OpenAI API request failed: {str(e)}. Response: {response.text if 'response' in locals() else 'No response'}")
+        except json.JSONDecodeError as e:
+            logger.error(f"OpenAI API response not valid JSON: {e}")
+            raise AIClientException(f"OpenAI API response was not valid JSON: {str(e)}")
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            raise AIClientException(f"An unexpected error occurred: {str(e)}")
+
+    def _process_response(self, response: Dict) -> AIResponse:
+        """
+        Processes the response from the OpenAI API into the AIResponse format.
+
+        Args:
+            response: The JSON response from the OpenAI API.
+
+        Returns:
+            An AIResponse object.
+
+        Raises:
+            AIClientException: If the response is not in the expected format.
+        """
+        try:
+            if (
+                response
+                and response.get("choices")
+                and len(response.get("choices", [])) > 0
+                and response["choices"][0].get("message")
+                and response["choices"][0]["message"].get("content")
+            ):
+                content = response["choices"][0]["message"]["content"].strip()
+            else:
+                content = "No response from the API."
+
+            if not content:
+                raise AIClientException("Empty response from OpenAI API")
+
+            return AIResponse(
+                content=content,
+                metadata={
+                    "model": self._model_name,
+                    "raw_response": response,
+                    "usage": response.get("usage", {})
+                },
+            )
+        except KeyError as e:
+            logger.error(f"Missing key in OpenAI response: {e}")
+            raise AIClientException(f"Missing key in OpenAI API response: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error processing OpenAI response: {e}")
+            raise AIClientException(f"Failed to process OpenAI API response: {str(e)}")
+
+    @property
+    def model_name(self) -> str:
+        """Get the current model name."""
+        return self._model_name
+
+    @model_name.setter
+    def model_name(self, value: str):
+        """Set the model name."""
+        self._model_name = value
+        logger.info(f"Model name updated to: {value}")
+
+    @property
+    def max_tokens(self) -> int:
+        """Get the current max tokens."""
+        return self._max_tokens
+
+    @max_tokens.setter
+    def max_tokens(self, value: int):
+        """Set max tokens."""
+        self._max_tokens = value
+        logger.info(f"Max tokens updated to: {value}")
+
+    @property
+    def temperature(self) -> float:
+        """Get the current temperature."""
+        return self._temperature
+
+    @temperature.setter
+    def temperature(self, value: float):
+        """Set temperature."""
+        self._temperature = value
+        logger.info(f"Temperature updated to: {value}")
+
 def create_ai_client(
     client_type: str = "abacus",
     api_key: Optional[str] = None,
-    model_name: Optional[str] = None,  # Changed to Optional, no default
+    model_name: Optional[str] = None,
     max_tokens: int = 10000,
     temperature: float = 0.7,
     **kwargs: Any
@@ -470,7 +645,8 @@ def create_ai_client(
     clients = {
         "abacus": AbacusAIClient,
         "gemini": GeminiAIClient,
-        "grok": GrokAIClient, 
+        "grok": GrokAIClient,
+        "openai": OpenAIClient,  # Added OpenAI client
     }
 
     if client_type not in clients:
