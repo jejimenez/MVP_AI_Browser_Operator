@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hackathon Demo - Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #28a745;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Hackathon Demo - Test Page</h1>
+    <div class="container">
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" id="username" placeholder="Enter your username">
+        </div>
+        <div class="form-group">
+            <label for="category-select">Category</label>
+            <select class="category-select">
+                <option value="tech">Technology</option>
+                <option value="health">Health</option>
+                <option value="education">Education</option>
+            </select>
+        </div>
+        <button onclick="submitForm()">Submit</button>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        function submitForm() {
+            const username = document.getElementById('username').value;
+            const category = document.querySelector('.category-select').value;
+            const resultDiv = document.getElementById('result');
+            if (username && category) {
+                resultDiv.innerHTML = `Hello, ${username}! You selected: ${category}`;
+                resultDiv.style.display = 'block';
+            } else {
+                resultDiv.innerHTML = 'Please fill out all fields.';
+                resultDiv.style.display = 'block';
+                resultDiv.style.color = 'red';
+            }
+        }
+    </script>
+</body>
+</html>

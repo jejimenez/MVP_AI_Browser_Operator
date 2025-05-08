@@ -127,7 +127,7 @@ class OperatorRunnerService(OperatorRunnerInterface):
             
     async def _get_fallback_locator_instruction(self, instruction: str, error_message: str, gherkin_step: GherkinStep) -> Optional[str]:
         """Generate a fallback instruction for strict mode violations."""
-        logger.debug(f"Generating fallback for instruction: {instruction}, error: {error_message}, Gherkin step: {gherkin_step.gherkin}, Target: {gherkin_step.target}")
+        logger.debug(f"Generating fallback for instruction: {instruction} to: {instruction.replace('.click()', '.nth(0).click()')}")
         return instruction.replace(".click()", ".nth(0).click()")
     
     async def run_operator_case(self, url: str, natural_language_steps: str, headless: Optional[bool] = None) -> OperatorCaseResult:
@@ -278,7 +278,7 @@ class OperatorRunnerService(OperatorRunnerInterface):
                 try:
                     instruction_data = json.loads(instruction_json)
                     last_error = None
-
+                    logger.debug(f"Instruction Data >> {instruction_data}")
                     for instruction in instruction_data.get("high_precision", []):
                         logger.debug(f"Trying high precision instruction > {instruction}")
                         execution_result = await self._browser_manager.execute_step(instruction)
@@ -418,7 +418,7 @@ class OperatorRunnerFactory:
                 headless=headless,
                 viewport_width=kwargs.get('viewport_width', 1920),
                 viewport_height=kwargs.get('viewport_height', 1080),
-                timeout=kwargs.get('timeout', 30000),
+                timeout=kwargs.get('timeout', 5000),
                 screenshot_dir=kwargs.get('screenshot_dir', 'screenshots'),
                 trace_dir=kwargs.get('trace_dir', 'traces')
             )

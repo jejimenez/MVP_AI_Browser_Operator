@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hackathon Demo - Advanced Test Page</title>
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            max-width: 1000px;
+            margin: 40px auto;
+            padding: 20px;
+            background-color: #121212; /* Dark theme */
+            color: #ffffff;
+        }
+        h1 {
+            text-align: center;
+            color: #00e676; /* Bright green */
+            font-size: 2.5em;
+            margin-bottom: 30px;
+        }
+        .form-wrapper {
+            display: flex;
+            justify-content: flex-end; /* Right-aligned */
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px; /* Uneven spacing */
+            background: #1c1c1c;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+        }
+        .input-section {
+            flex: 1;
+            min-width: 200px;
+        }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #b0bec5;
+        }
+        input[type="text"], select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #00e676;
+            border-radius: 8px;
+            background: #2a2a2a;
+            color: #ffffff;
+            font-size: 1em;
+        }
+        select {
+            appearance: none;
+            background-image: url('data:image/svg+xml;utf8,<svg fill="%23ffffff" height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg"><path d="M7 10l5 5 5-5z"/></svg>');
+            background-repeat: no-repeat;
+            background-position-x: 98%;
+            background-position-y: 50%;
+        }
+        .button-group {
+            display: flex;
+            gap: 15px;
+        }
+        button.action-btn {
+            background-color: #00e676;
+            color: #121212;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: 600;
+            transition: background-color 0.3s;
+        }
+        button.action-btn.reset {
+            background-color: #ff5252;
+        }
+        button.action-btn:hover {
+            background-color: #00c853;
+        }
+        button.action-btn.reset:hover {
+            background-color: #d32f2f;
+        }
+        #output {
+            margin-top: 30px;
+            padding: 15px;
+            border: 2px dashed #00e676;
+            border-radius: 8px;
+            background: #2a2a2a;
+            display: none;
+            font-size: 1.2em;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Hackathon Demo - Advanced Test Page</h1>
+    <div class="form-wrapper">
+        <div class="button-group">
+            <button class="action-btn" onclick="submitForm()" aria-label="Submit Form">Confirm</button>
+            <button class="action-btn reset" onclick="resetForm()" aria-label="Reset Form">Reset</button>
+        </div>
+        <div class="input-section">
+            <label for="topic-selector">Topic</label>
+            <select id="topic-selector" aria-label="Topic Selection">
+                <option value="tech">Tech Innovation</option>
+                <option value="health">Healthcare</option>
+                <option value="education">Learning</option>
+            </select>
+        </div>
+        <div class="input-section">
+            <label for="user-entry">User ID</label>
+            <input type="text" id="user-entry" placeholder="Enter user ID" aria-label="User ID Input">
+        </div>
+        <div id="output"></div>
+    </div>
+
+    <script>
+        function submitForm() {
+            const username = document.getElementById('user-entry').value;
+            const category = document.getElementById('topic-selector').value;
+            const resultDiv = document.getElementById('output');
+            if (username && category) {
+                resultDiv.innerHTML = `User: ${username}, Topic: ${category.toUpperCase()}`;
+                resultDiv.style.display = 'block';
+                resultDiv.style.color = '#00e676';
+            } else {
+                resultDiv.innerHTML = 'Please complete all fields!';
+                resultDiv.style.display = 'block';
+                resultDiv.style.color = '#ff5252';
+            }
+        }
+
+        function resetForm() {
+            document.getElementById('user-entry').value = '';
+            document.getElementById('topic-selector').value = 'tech';
+            const resultDiv = document.getElementById('output');
+            resultDiv.innerHTML = '';
+            resultDiv.style.display = 'none';
+        }
+    </script>
+</body>
+</html>

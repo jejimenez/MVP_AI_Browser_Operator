@@ -18,7 +18,7 @@ async def test_browser_manager_start():
         headless=True,
         viewport_width=1280,
         viewport_height=720,
-        timeout=30000
+        timeout=5000
     )
 
     browser_manager = create_browser_manager(config=config)

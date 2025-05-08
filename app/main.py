@@ -1,5 +1,4 @@
 # app/main.py
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -29,7 +28,7 @@ app.add_middleware(
 )
 
 # Mount static files
-app.mount("/static", StaticFiles(directory="app"), name="static")
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # Mount screenshots directory
 screenshots_dir = settings.browser_config.screenshot_dir
@@ -44,8 +43,25 @@ app.include_router(api_router, prefix="/api")
 # Root endpoint to serve the HTML file
 @app.get("/", tags=["Root"])
 async def root():
-    return FileResponse("app/index.html")
+    logger.debug("Serving root endpoint")
+    return FileResponse("app/static/index.html")
 
-# Optional: custom exception handlers, startup/shutdown events, etc.
-# Example:
-# @
+# New endpoint to serve the test webpage
+@app.get("/web-app", tags=["Test Page"])
+async def serve_test_page():
+    file_path = "app/static/web-app.html"
+    if os.path.exists(file_path):
+        return FileResponse(file_path)
+    else:
+        logger.error(f"Test page not found at {file_path}")
+        return {"error": "Test page not found"}
+
+@app.get("/web-app-v2", tags=["Test Page V2"])
+async def serve_test_page_v2():
+    logger.debug("Serving test page: web-app-v2.html")
+    file_path = "app/static/web-app-v2.html"
+    if os.path.exists(file_path):
+        return FileResponse(file_path)
+    else:
+        logger.error(f"Test page not found at {file_path}")
+        return {"error": "Test page V2 not found"}

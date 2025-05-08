@@ -214,7 +214,7 @@ class GeminiAIClient(AIClientInterface):
             response = requests.post(self._base_url, headers=headers, json=payload)
             response.raise_for_status()  # Raise for bad status codes
             data = response.json()
-            logger.debug(f"Received response from Gemini API: {data}")
+            #logger.debug(f"Received response from Gemini API: {data}")
             return self._process_response(data)
 
         except requests.exceptions.RequestException as e:
@@ -372,7 +372,7 @@ class GrokAIClient(AIClientInterface):
             response = requests.post(self._base_url, headers=headers, json=payload)
             response.raise_for_status()  # Raise for bad status codes
             data = response.json()
-            logger.debug(f"Received response from Grok API: {data}")
+            #logger.debug(f"Received response from Grok API: {data}")
             return self._process_response(data)
 
         except requests.exceptions.RequestException as e:
@@ -544,7 +544,7 @@ You should:
             response = requests.post(self._base_url, headers=headers, json=payload)
             response.raise_for_status()
             data = response.json()
-            logger.debug(f"Received response from OpenAI API: {data}")
+            #logger.debug(f"Received response from OpenAI API: {data}")
             return self._process_response(data)
 
         except requests.exceptions.RequestException as e:

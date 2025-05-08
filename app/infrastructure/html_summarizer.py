@@ -1,4 +1,3 @@
-# app/infrastructure/html_summarizer.py
 from typing import Dict, Optional, List, Any
 from bs4 import BeautifulSoup, Comment, NavigableString
 from app.utils.config import HTML_SUMMARIZER_CONFIG
@@ -6,16 +5,16 @@ from app.infrastructure.interfaces import HTMLSummarizerInterface
 import logging
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.CRITICAL + 1)
+logger.setLevel(logging.DEBUG)  # Set to DEBUG for detailed logging
 
 class HTMLSummarizer(HTMLSummarizerInterface):
-    """Converts HTML to a JSON DOM for visible elements, compatible with Playwright.
+    """Converts HTML to a JSON DOM for visible and hidden elements, compatible with Playwright.
 
     Responsibilities:
     - Parse HTML using a configurable parser (default: lxml).
-    - Filter visible elements based on style and attributes.
+    - Filter elements based on style and attributes, marking visibility.
     - Map tags to accessibility roles and extract names.
-    - Produce a JSON structure for AI-driven Playwright instructions.
+    - Produce a JSON structure for AI-driven Playwright instructions, including visibility status.
     """
     def __init__(self, parser: str = 'lxml', config: Dict = HTML_SUMMARIZER_CONFIG):
         """Initialize with parser and configuration.
@@ -30,11 +29,15 @@ class HTMLSummarizer(HTMLSummarizerInterface):
         self.visible_attributes = config['visible_attributes']
 
     def is_visible(self, element: BeautifulSoup) -> bool:
-        """Check if an element is visible based on style, attributes, or content."""
+        """Check if an element and its parents are visible based on style, attributes, or content."""
         logger.debug(f"Checking visibility for element: {element.name}, attrs: {element.attrs}")
+        
+        # Skip comments and strings
         if isinstance(element, (Comment, NavigableString)):
             logger.debug("Skipping comment or string")
             return False
+        
+        # Check element's own visibility
         style = element.get('style', '')
         if 'display: none' in style or 'visibility: hidden' in style or 'opacity: 0' in style:
             logger.debug("Invisible due to style")
@@ -42,23 +45,52 @@ class HTMLSummarizer(HTMLSummarizerInterface):
         if element.get('hidden') or element.get('aria-hidden') == 'true':
             logger.debug("Invisible due to hidden or aria-hidden")
             return False
+        
+        # Check parent visibility recursively
+        parent = element.parent
+        while parent and parent.name != '[document]':
+            parent_style = parent.get('style', '')
+            if 'display: none' in parent_style or 'visibility: hidden' in parent_style or 'opacity: 0' in parent_style:
+                logger.debug(f"Invisible due to parent style: {parent.name}")
+                return False
+            if parent.get('hidden') or parent.get('aria-hidden') == 'true':
+                logger.debug(f"Invisible due to parent hidden or aria-hidden: {parent.name}")
+                return False
+            parent_classes = parent.get('class', [])
+            if isinstance(parent_classes, list) and 'mobile-nav' in parent_classes:
+                logger.debug(f"Invisible due to mobile-nav class in parent: {parent.name}")
+                return False
+            parent = parent.parent
+        
+        # Check if element is interactive
         interactive = element.name in ['a', 'button', 'input', 'select', 'textarea'] or \
                       element.get('role') in ['button', 'link', 'textbox', 'combobox', 'menuitem', 'tab']
         if interactive:
-            logger.debug("Visible as interactive element")
-            return True
+            text = element.get_text(strip=True)
+            if text or element.attrs or element.find_all(recursive=False):
+                logger.debug("Visible as interactive element with content")
+                return True
+            logger.debug("Invisible interactive element: no text, attributes, or children")
+            return False
+        
+        # Check special elements
         if element.name in ['img', 'svg', 'canvas', 'iframe']:
             logger.debug("Visible as special element")
             return True
+        
+        # Check text content
         text = element.get_text(strip=True)
         if not text and not element.find_all(recursive=False):
             logger.debug("Invisible: no text or children")
             return False
+        
+        # Check children
         if element.find_all(recursive=False):
             for child in element.find_all(recursive=False):
                 if self.is_visible(child):
                     logger.debug("Visible due to visible child")
                     return True
+        
         return bool(text)
 
     def tag_to_role(self, tag_name: str, element: BeautifulSoup) -> Optional[str]:
@@ -72,6 +104,9 @@ class HTMLSummarizer(HTMLSummarizerInterface):
             role = self.input_type_map.get(input_type, 'textbox')
             logger.debug(f"Input type {input_type} mapped to role: {role}")
             return role
+        if tag_name == 'select':
+            logger.debug("Mapping select to combobox")
+            return 'combobox'
         role = self.role_map.get(tag_name, 'generic')
         logger.debug(f"Tag {tag_name} mapped to role: {role}")
         return role
@@ -83,7 +118,6 @@ class HTMLSummarizer(HTMLSummarizerInterface):
             logger.warning(f"Element {element} has no attributes")
             return ''
 
-        # Robust aria-label check
         aria_label = element.get('aria-label', '').strip()
         if not aria_label:
             for attr in element.attrs:
@@ -94,14 +128,12 @@ class HTMLSummarizer(HTMLSummarizerInterface):
             logger.debug(f"Name from aria-label: {aria_label}")
             return aria_label
 
-        # Direct text for non-generic roles
         role = self.tag_to_role(element.name, element)
         direct_text = element.string.strip() if element.string else ''
         if direct_text and role != 'generic':
             logger.debug(f"Name from direct text: {direct_text}")
             return direct_text
 
-        # Child text for generic roles without child elements
         if role == 'generic':
             child_elements = element.find_all(recursive=False)
             if not child_elements and text:
@@ -109,7 +141,6 @@ class HTMLSummarizer(HTMLSummarizerInterface):
                 return text
             logger.debug(f"Skipping child text for generic role with {len(child_elements)} children")
 
-        # Special cases
         if element.name == 'img':
             name = element.get('alt', '').strip()
             logger.debug(f"Name from alt: {name}")
@@ -117,7 +148,7 @@ class HTMLSummarizer(HTMLSummarizerInterface):
         if element.name in ['input', 'textarea', 'select']:
             name = (element.get('aria-label', '').strip() or
                     element.get('value', '').strip() or
-                    element.get('placeholder', '').strip() or  # Moved placeholder before name
+                    element.get('placeholder', '').strip() or
                     element.get('name', '').strip())
             logger.debug(f"Name for input/textarea/select: {name}")
             return name
@@ -130,10 +161,7 @@ class HTMLSummarizer(HTMLSummarizerInterface):
         return ''
 
     def element_to_json(self, element: BeautifulSoup) -> Optional[Dict[str, Any]]:
-        """Convert an element to JSON representation."""
-        if not self.is_visible(element):
-            logger.debug(f"Skipping invisible element: {element.name}")
-            return None
+        """Convert an element to JSON representation, including visibility status."""
         if not element.name:
             logger.warning(f"Skipping element with no tag name: {element}")
             return None
@@ -143,6 +171,9 @@ class HTMLSummarizer(HTMLSummarizerInterface):
         if role is None:
             logger.debug(f"Filtering out element with no role: {element.name}")
             return None
+
+        is_visible = self.is_visible(element)
+        logger.debug(f"Element {element.name} visibility: {is_visible}")
 
         attributes = {
             key: value for key, value in element.attrs.items()
@@ -156,8 +187,9 @@ class HTMLSummarizer(HTMLSummarizerInterface):
         node = {'role': role, 'name': name}
         if attributes:
             node['attributes'] = attributes
+        if not is_visible:
+            node['visibility'] = 'hidden'
 
-        # Heading level
         if role == 'heading':
             if 'aria-level' in attributes:
                 try:
@@ -169,18 +201,15 @@ class HTMLSummarizer(HTMLSummarizerInterface):
                 node['level'] = int(element.name[1]) if element.name.startswith('h') and element.name[1].isdigit() else 1
             logger.debug(f"Assigned heading level: {node['level']}")
 
-        # Focused state
         if element.get('focused') == 'true' or (
             element.name in ['input', 'textarea'] and
             element == element.find_parent().find(focus=True)
         ):
             node['focused'] = True
 
-        # Popup
         if element.get('haspopup'):
             node['haspopup'] = element['haspopup']
 
-        # Children
         children = [
             child_json for child in element.find_all(recursive=False)
             if (child_json := self.element_to_json(child))
@@ -188,26 +217,17 @@ class HTMLSummarizer(HTMLSummarizerInterface):
         if children:
             node['children'] = children
 
-        # Text role override
         if text and role == 'text' and text != name and 'aria-label' not in attributes:
             node = {'role': 'text', 'name': text}
+            if not is_visible:
+                node['visibility'] = 'hidden'
             logger.debug(f"Overwriting name for role=text to: {text}")
 
-        logger.debug(f"Processed element: {element.name}, role: {role}, name: {node['name']}, children: {len(children)}")
+        logger.debug(f"Processed element: {element.name}, role: {role}, name: {node['name']}, visibility: {is_visible}, children: {len(children)}")
         return node
 
     def summarize_html(self, html_content: str) -> Dict[str, Any]:
-        """Convert HTML to JSON DOM for visible elements.
-
-        Args:
-            html_content: HTML string to process.
-
-        Returns:
-            Dict: JSON representation of visible DOM elements.
-
-        Raises:
-            ValueError: If html_content is None.
-        """
+        """Convert HTML to JSON DOM for elements, including visibility status."""
         if html_content is None:
             logger.error("html_content is None")
             raise ValueError("html_content cannot be None")
