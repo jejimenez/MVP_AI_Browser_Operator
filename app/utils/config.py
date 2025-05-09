@@ -1,5 +1,3 @@
-# app/utils/config.py
-
 import os
 from functools import lru_cache
 from typing import List, Optional
@@ -17,10 +15,10 @@ class BrowserConfig(BaseModel):
 
 class AbacusConfig(BaseModel):
     """Abacus.AI specific configuration."""
-    api_key: str = Field(alias="abacus_api_key")
+    api_key: Optional[str] = Field(default=None, alias="abacus_api_key")
     base_url: HttpUrl = Field(default="https://api.abacus.ai", alias="abacus_base_url")
-    deployment_id: str = Field(alias="abacus_deployment_id")
-    deployment_token: str = Field(alias="abacus_deployment_token")
+    deployment_id: Optional[str] = Field(default=None, alias="abacus_deployment_id")
+    deployment_token: Optional[str] = Field(default=None, alias="abacus_deployment_token")
 
     model_config = ConfigDict(
         populate_by_name=True,  # Allows population by alias
@@ -46,17 +44,17 @@ class Settings(BaseSettings):
     browser_config: BrowserConfig = BrowserConfig()
 
     # Abacus.AI settings
-    abacus_api_key: str
+    abacus_api_key: Optional[str] = None
     abacus_base_url: HttpUrl = "https://api.abacus.ai"
-    abacus_deployment_id: str
-    abacus_deployment_token: str
+    abacus_deployment_id: Optional[str] = None
+    abacus_deployment_token: Optional[str] = None
 
     # Application specific settings
-    usr: str
-    pw: str
-    secret: str
-    url: HttpUrl
-    special_div: str
+    usr: Optional[str] = None
+    pw: Optional[str] = None
+    secret: Optional[str] = None
+    url: Optional[HttpUrl] = None
+    special_div: Optional[str] = None
 
     # New style configuration using SettingsConfigDict
     model_config = SettingsConfigDict(
@@ -90,6 +88,7 @@ def get_abacus_config() -> AbacusConfig:
         deployment_token=settings.abacus_deployment_token
     )
 
+# HTML_SUMMARIZER_CONFIG remains unchanged
 HTML_SUMMARIZER_CONFIG = {
     'role_map': {
         'a': 'link',

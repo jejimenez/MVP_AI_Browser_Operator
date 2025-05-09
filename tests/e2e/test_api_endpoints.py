@@ -13,12 +13,11 @@ class TestAPIEndpoints:
         response = client.post(
             "/api/operator/execute",
             json={
-                "url": "https://dev-psa.dev.ninjarmm.com/auth/",
+                "url": "http://localhost:8000/web-app-v2",
                 "test_steps": """
-                    Given I am on the login page
-                    When I enter "username@gmail.com" into Email field
-                    And I enter "pass" into password field
-                    Then I click Sign in button
+                    1. Enter "username@test.com" username
+                    2. Choose any category
+                    3. Submit the form
                 """,
                 "headless": """False"""
             },
@@ -54,12 +53,11 @@ class TestAPIEndpoints:
                 "suite_id": "test_suite_1",
                 "test_cases": [
                     {
-                        "url": "https://dev-psa.dev.ninjarmm.com/auth/",
+                        "url": "http://localhost:8000/web-app-v2",
                         "test_steps": """
-                            Given I am on the login page
-                            When I enter "username@gmail.com" into Email field
-                            And I enter "pass" into password field
-                            Then I click Sign in button
+                        1. Enter "username@test.com" username
+                        2. Choose any category
+                        3. Submit the form
                         """
                     }
                 ]

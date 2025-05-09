@@ -54,7 +54,7 @@ class TestOperatorRunnerIntegration:
     @pytest.mark.asyncio
     async def test_successful_operator_execution(self, runner, sample_test_case):
         result = await runner.run_operator_case(
-            url="https://dev-psa.dev.ninjarmm.com",
+            url="http://localhost:8000/web-app-v2",
             natural_language_steps=sample_test_case
         )
 
@@ -114,12 +114,11 @@ class TestOperatorRunnerIntegration:
 
             # Run the test case
             result = await runner.run_operator_case(
-                url="https://dev-psa.dev.ninjarmm.com",
+                url="http://localhost:8000/web-app-v2",
                 natural_language_steps="""
-                Navigate to login page
-                Enter email
-                Enter password
-                Click sign in
+                1. Enter "username@test.com" username
+                2. Choose any category
+                3. Submit the form
                 """
             )
 
@@ -160,7 +159,7 @@ class TestOperatorRunnerIntegration:
 
             # Verify final state
             final_step = result.steps_results[-1]
-            assert "dev-psa.dev.ninjarmm.com" in final_step.execution_result.page_url
+            assert "localhost:8000/web-app-v2" in final_step.execution_result.page_url
 
     @pytest.mark.asyncio
     async def test_failed_operator_execution(self, runner):
