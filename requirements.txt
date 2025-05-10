@@ -12,10 +12,12 @@ python-dotenv==1.0.0
 
 # HTML parsing
 beautifulsoup4==4.12.3
+lxml==5.4.0
+html5lib==1.1  # Added for HTMLSummarizer fallback parser
 
 # Type safety and settings
 pydantic==2.7.1
-pydantic-settings==2.2.1  # Add this line
+pydantic-settings==2.2.1
 
 # Playwright for browser automation
 playwright==1.41.2
@@ -30,13 +32,11 @@ psutil==5.9.8
 pytest==8.0.0
 pytest-asyncio==0.23.5
 pytest-mock==3.14.0
-
-# For test client
+pytest-cov==5.0.0
 requests==2.31.0
 
-# Optional: for coverage reporting
-pytest-cov==5.0.0
+# Optional: enhanced logging
+loguru==0.7.2  # Optional for better debugging
 
-lxml==5.4.0
-
+# Other
 pyotp==2.9.0

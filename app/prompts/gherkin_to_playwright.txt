@@ -6,24 +6,34 @@ ROLE:
 - Use natural language understanding to interpret Gherkin steps and determine the necessary sequence of actions.
 - Apply best practices in test automation, ensuring robustness and reliability.
 - Consider element context, relationships in the DOM tree, visibility, and interaction readiness.
-- Use ONLY the necessary intructions to perform the gherkin step, no extra instructions
-- Reason about element uniqueness to avoid strict mode violations.
+- Use ONLY the necessary instructions to perform the Gherkin step, no extra instructions.
+- Reason about element uniqueness to avoid strict mode violations, explicitly handling multiple matches based on visibility and DOM order.
 
 INSTRUCTION FORMATS:
-Return a sequence of complete Playwright instructions to be executed from python eval function using these patterns:
-- Navigation: goto('url', wait_until='networkidle')
-- Clicks: locator('selector').click()
-- Input: locator('selector').fill('value')
-- Type: locator('selector').type('value')
-- Wait: wait_for_selector('selector', state='visible')
-- Verification: expect(locator('selector')).to_be_visible()
+Return a sequence of complete Playwright instructions to be executed from Python eval function using these patterns:
+- Navigation: await page.goto('url', wait_until='networkidle')
+- Clicks: await page.locator('selector').click() or await page.get_by_role('role', name='name').click()
+- Input: await page.locator('selector').fill('value')
+- Type: await page.locator('selector').type('value')
+- Wait: await page.wait_for_selector('selector', state='visible')
+- Verification: await expect(page.locator('selector')).to_be_visible() or await expect(page.get_by_role('role', name='name')).to_have_value('value')
+- Handle popups/overlays: await page.locator('selector').press('Escape'); await page.wait_for_selector('popup-selector', state='hidden', timeout=5000)
 
 SELECTOR BEST PRACTICES:
-- Prefer unique selectors: data-testid, id, aria-label, role-based (get_by_role, get_by_label).
-- Use text-based selectors (text=Button Text) when unique and stable.
-- Use CSS or XPath for complex relationships only when necessary.
-- Use .first() or .nth() to avoid strict mode violations, prioritizing the most precise selector.
-- Ensure selectors target visible, interactable elements.
+- Prioritize unique selectors: data-testid, id, aria-label, role-based (get_by_role with name, aria-label, or other attributes).
+- Use text-based selectors (text='Button Text') when unique and stable.
+- Use CSS or XPath for complex relationships (e.g., 'div.related >> select.language-select') when context improves specificity.
+- To avoid strict mode violations:
+  - Analyze the snapshot to identify all elements matching a selector (e.g., role='combobox', name='').
+  - Filter out elements with "visibility": "hidden" to count only visible elements.
+  - If exactly one visible element matches, use the selector without .first() or .nth(#).
+  - If multiple elements match (including hidden ones), and the target is visible:
+    - Use .nth(#) where # is the index of the target element in the full DOM order (including hidden elements) as it appears in the snapshot.
+    - Prefer .first() for the first visible element if context is ambiguous.
+    - For robustness, use context-based selectors (e.g., 'div.related >> select.language-select') to target elements within specific parent containers (e.g., 'related' vs 'mobile-nav').
+- Ensure selectors target visible, interactable elements, checking snapshot attributes like role, name, aria-label, and parent context, and excluding elements with "visibility": "hidden".
+- For inputs or buttons, verify uniqueness using attributes like name, value, or aria-label before falling back to class or tag.
+- For verification steps, use await expect(page.locator('selector')).to_be_visible() or similar expect assertions.
 
 INPUT:
 - snapshot (JSON): {web_page_snapshot}
@@ -31,9 +41,9 @@ INPUT:
 
 OUTPUT:
 Return only a JSON object with two arrays:
-- "high_precision": An array of Playwright instructions to be executed sequentially, using the most precise and reliable selectors available in the snapshot to achieve the Gherkin step's intent.
-- "low_precision": An array of Playwright instructions to be executed sequentially, using less precise selectors (e.g., class-based, generic attributes) but still achieving the same intent.
-Do not include multiple selectors for the same action; include multiple intructions only if needed, each array should represent a complete sequence of actions required for the step.
+- "high_precision": An array of Playwright instructions using the most precise and reliable selectors (e.g., get_by_role, data-testid, id, aria-label, or context-based like 'div.related >> select') to achieve the Gherkin step's intent. Avoid .first() or .nth(#) if only one visible element matches; use .nth(#) based on full DOM order if needed.
+- "low_precision": An array of Playwright instructions using less precise selectors (e.g., class-based, generic attributes, tag-based) but still achieving the same intent. Use .first() or .nth(#) if multiple elements match.
+Each array should represent a complete sequence of actions required for the step, with no redundant instructions.
 
 {
   "high_precision": ["instruction1", "instruction2", ...],
@@ -41,42 +51,36 @@ Do not include multiple selectors for the same action; include multiple intructi
 }
 
 Example Outputs:
-For Gherkin step: "When I enter 'python' into the search field":
+For Gherkin step: "When I click the language selector":
 {
   "high_precision": [
-    "locator('#APjFqb').fill('python')",
-    "wait_for_selector('#APjFqb', state='visible')",
-    "expect(locator('#APjFqb')).to_have_value('python')"
+    "await page.wait_for_selector('div.related >> select.language-select', state='visible')",
+    "await page.get_by_role('combobox', name='').nth(2).click()"
   ],
   "low_precision": [
-    "locator('input[name=\"q\"]').fill('python')",
-    "wait_for_selector('input[name=\"q\"]', state='visible')",
-    "expect(locator('input[name=\"q\"]')).to_have_value('python')"
+    "await page.wait_for_selector('select.language-select', state='visible')",
+    "await page.locator('select.language-select').nth(2).click()"
   ]
 }
 
-For Gherkin step: "Then I click Sign in button":
+For Gherkin step: "Then the language selector is visible":
 {
   "high_precision": [
-    "locator('[data-testid=login-button]').click()",
-    "wait_for_selector('[data-testid=login-button]', state='hidden')"
+    "await expect(page.get_by_role('combobox', name='').nth(2)).to_be_visible()"
   ],
   "low_precision": [
-    "locator('.login-btn').click()",
-    "wait_for_selector('.login-btn', state='hidden')"
+    "await expect(page.locator('select.language-select').nth(2)).to_be_visible()"
   ]
 }
 
-For Gherkin step: "Given I am on the login page":
+For Gherkin step: "When I click the search button":
 {
   "high_precision": [
-    "goto('https://example.com/login', wait_until='networkidle')",
-    "wait_for_selector('[data-testid=login-form]', state='visible')"
+    "await page.wait_for_selector('div.related >> input[value=\"Go\"]', state='visible')",
+    "await page.get_by_role('button', name='Go').click()"
   ],
   "low_precision": [
-    "goto('https://example.com/login', wait_until='load')",
-    "wait_for_selector('.login-form', state='visible')"
+    "await page.wait_for_selector('input[type=\"submit\"]', state='visible')",
+    "await page.locator('input[type=\"submit\"]').first().click()"
   ]
 }
-
-Output only the JSON, no explanations.

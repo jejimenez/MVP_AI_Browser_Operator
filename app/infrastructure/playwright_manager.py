@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any, List, AsyncGenerator
 from dataclasses import dataclass
 from datetime import datetime
+import inspect
 from pathlib import Path
 from app.domain.exceptions import SecurityException
 from typing import Set, Pattern
@@ -26,7 +27,7 @@ class BrowserConfig:
     headless: bool = True
     viewport_width: int = 1920
     viewport_height: int = 1080
-    timeout: int = 30000  # milliseconds
+    timeout: int = 5000  # milliseconds
     screenshot_dir: str = "screenshots"
     trace_dir: str = "traces"
 
@@ -213,57 +214,27 @@ class PlaywrightManager(BrowserManagerInterface):
 
             logger.debug(f"Executing instruction: {instruction}")
 
-            # Handle expect assertions
-            if instruction.startswith("expect(locator("):
-                if "to_have_value" in instruction:
-                    match = re.match(r"expect\(locator\(['\"]([^'\"]+)['\"]\)\)\.to_have_value\(['\"]([^'\"]+)['\"]\)", instruction)
-                    if match:
-                        selector, value = match.groups()
-                        locator = self._page.locator(selector)
-                        await expect(locator).to_have_value(value)
-                        result_value = None
-                elif "to_be_visible" in instruction:
-                    match = re.match(r"expect\(locator\(['\"]([^'\"]+)['\"]\)\)\.to_be_visible\(\)", instruction)
-                    if match:
-                        selector = match.group(1)
-                        locator = self._page.locator(selector)
-                        await expect(locator).to_be_visible()
-                        result_value = None
-                elif "to_have_text" in instruction:
-                    match = re.match(r"expect\(locator\(['\"]([^'\"]+)['\"]\)\)\.to_have_text\(['\"]([^'\"]+)['\"]\)", instruction)
-                    if match:
-                        selector, text = match.groups()
-                        locator = self._page.locator(selector)
-                        await expect(locator).to_have_text(text)
-                        result_value = None
-                else:
-                    raise ValueError(f"Unsupported expect instruction: {instruction}")
+            # Normalize instruction: replace selectOption with select_option
+            instruction = instruction.replace("selectOption", "select_option")
 
-            # Handle page.locator expect assertions (for backward compatibility)
-            elif instruction.startswith("expect(page.locator("):
-                if "to_be_visible" in instruction:
-                    match = re.match(r"expect\(page\.locator\(['\"]([^'\"]+)['\"]\)\)\.to_be_visible\(\)", instruction)
-                    if match:
-                        selector = match.group(1)
-                        locator = self._page.locator(selector)
-                        await expect(locator).to_be_visible()
-                        result_value = None
-                elif "to_have_text" in instruction:
-                    match = re.match(r"expect\(page\.locator\(['\"]([^'\"]+)['\"]\)\)\.to_have_text\(['\"]([^'\"]+)['\"]\)", instruction)
-                    if match:
-                        selector, text = match.groups()
-                        locator = self._page.locator(selector)
-                        await expect(locator).to_have_text(text)
-                        result_value = None
-                else:
-                    raise ValueError(f"Unsupported expect instruction: {instruction}")
-
-            # Handle navigation
-            elif instruction.startswith("goto("):
-                match = re.match(r"goto\(['\"](https?://[^'\"]+)['\"]", instruction)
+            # Handle goto with options
+            if instruction.startswith("goto("):
+                # Match goto('url', { options }) or goto('url')
+                match = re.match(r"goto\(['\"](https?://[^'\"]+)['\"](?:,\s*\{([^}]+)\})?\)", instruction)
                 if match:
                     url = match.group(1)
-                    await self._page.goto(url, wait_until='networkidle', timeout=30000)
+                    options_str = match.group(2) or ""
+                    options = {}
+                    if options_str:
+                        # Parse options (e.g., wait_until: 'load', timeout: 5000)
+                        # Handle both quoted values and numbers
+                        pairs = re.findall(r"(\w+):\s*(?:['\"]([^'\"]+)['\"]|(\d+))", options_str)
+                        for key, quoted_value, numeric_value in pairs:
+                            value = quoted_value if quoted_value else numeric_value
+                            options[key] = value if key != 'timeout' else int(value)
+                        logger.debug(f"Parsed goto options: {options}")
+                    await self._page.goto(url, **options)
+                    # Additional waits as in original
                     try:
                         await self._page.wait_for_load_state('networkidle', timeout=5000)
                         await self._page.wait_for_load_state('domcontentloaded')
@@ -275,39 +246,45 @@ class PlaywrightManager(BrowserManagerInterface):
                     except Exception as wait_error:
                         logger.warning(f"Additional waiting failed: {str(wait_error)}")
                     result_value = None
-
-            # Handle url()
-            elif instruction == "url()":
-                result_value = self._page.url
-
-            # Handle new get_by_label instructions
-            elif instruction.startswith("get_by_label("):
-                if ".first().click()" in instruction:
-                    match = re.match(r"get_by_label\(['\"](.+?)['\"]\)\.first\(\)\.click\(\)", instruction)
-                    if match:
-                        label = match.group(1)
-                        await self._page.get_by_label(label).first().click()
-                        result_value = None
                 else:
-                    raise ValueError(f"Unsupported get_by_label instruction: {instruction}")
-            # Handle other instructions
-            else:
-                clean_instruction = instruction.replace('await ', '').replace('page.', '')
-                exec_locals = {
-                    "page": self._page,
-                    "keyboard": self._page.keyboard
-                }
-                logger.debug(f"Instruction page.{clean_instruction}")
-                result_value = await eval(f"page.{clean_instruction}", {}, exec_locals)
+                    raise ValueError(f"Invalid goto instruction: {instruction}")
 
-                # For certain actions, wait for network idle
-                if any(action in clean_instruction for action in ['click', 'type', 'press', 'fill']):
+            # Create execution context for other instructions
+            else:
+                exec_globals = {
+                    "page": self._page,
+                    "expect": expect,
+                    "keyboard": self._page.keyboard,
+                    "locator": self._page.locator,
+                    "get_by_role": self._page.get_by_role,
+                    "get_by_label": self._page.get_by_label,
+                    "goto": self._page.goto,
+                    "url": self._page.url,
+                    "__builtins__": {},  # Restrict builtins for safety
+                }
+
+                # Handle await
+                if instruction.startswith("await "):
+                    instruction = instruction[6:]  # Remove "await "
+
+                # Execute instruction
+                code = compile(instruction, "<string>", "eval")
+                result = eval(code, exec_globals)
+
+                # Handle awaitable results
+                if inspect.isawaitable(result):
+                    result_value = await result
+                else:
+                    result_value = result
+
+                # Post-action wait for interactive actions
+                if any(action in instruction for action in ['click', 'fill', 'select_option', 'press']):
                     try:
                         await self._page.wait_for_load_state('networkidle', timeout=5000)
                     except Exception as wait_error:
                         logger.debug(f"Post-action waiting skipped: {str(wait_error)}")
 
-            # Take screenshot after execution
+            # Take screenshot
             screenshot_path = await self._take_screenshot()
 
             execution_time = (datetime.now() - start_time).total_seconds()

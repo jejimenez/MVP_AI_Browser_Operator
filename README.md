@@ -148,9 +148,6 @@ enter email \'test@example.com\'\", \"Then I click submit\"\],
 
 \"execution_status\": \"completed\",
 
-\"logs\": \[\"Navigated to https://dev-psa.dev.ninjarmm.com\", \"Filled
-email field\", \"Clicked submit button\"\]
-
 }
 
 }
@@ -199,8 +196,8 @@ curl -X POST http://localhost:8000/api/operator/execute \
 -H "X-API-Key: test_key" \
 -H "X-Tenant-ID: test_tenant" \
 -d '{
-    "url": "https://playwright.dev/",
-    "test_steps": "1. Click in Get started 2. Click in How to install Playwright ",
+    "url": "http://localhost:8000/web-app-v2",
+    "test_steps": "Enter \"username@test.com\" username, choose any category, submit the form",
     "headless": false
 }'
 
