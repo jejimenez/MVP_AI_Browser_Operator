@@ -21,6 +21,8 @@ pydantic-settings==2.2.1
 
 # Playwright for browser automation
 playwright==1.41.2
+# Install Playwright browsers after installing requirements
+# Run: playwright install chromium
 
 # Abacus.AI client
 abacusai==1.4.40
